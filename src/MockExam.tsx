@@ -1216,7 +1216,7 @@ D. Country`}</pre>
             Strict 1-hour timer. Exam auto-submits when time runs out.
           </div>
 
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="flex-col-mobile" style={{ display: "flex", gap: 8 }}>
             <button
               onClick={startExam}
               style={{
@@ -1510,6 +1510,7 @@ D. Country`}</pre>
 
           {/* score banner */}
           <div
+            className="flex-col-mobile"
             style={{
               background: scoreBg(scorePercent),
               borderRadius: "var(--radius)",
@@ -1518,6 +1519,7 @@ D. Country`}</pre>
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
+              gap: 16,
             }}
           >
             <div>
@@ -1595,6 +1597,7 @@ D. Country`}</pre>
 
           {/* save prompt */}
           <div
+            className="flex-col-mobile"
             style={{
               background: "var(--cream)",
               border: "1px solid var(--cream-border)",
@@ -1690,7 +1693,7 @@ D. Country`}</pre>
           )}
 
           {/* actions */}
-          <div style={{ display: "flex", gap: 8, marginTop: 24 }}>
+          <div className="flex-col-mobile" style={{ display: "flex", gap: 8, marginTop: 24 }}>
             <button
               onClick={startExam}
               style={{

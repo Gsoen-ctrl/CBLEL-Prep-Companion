@@ -503,13 +503,7 @@ function WeeklyOverview({
   today.setHours(0, 0, 0, 0);
   const weekDates = getWeekDates(weekOffset);
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-        gap: 6,
-      }}
-    >
+    <div className="dashboard-week-grid">
       {weekDates.map((d) => {
         const isToday = d.toDateString() === today.toDateString();
         const past = d < today;
@@ -783,13 +777,7 @@ export default function Dashboard({
       </div>
 
       {/* stat cards */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-          gap: 10,
-        }}
-      >
+      <div className="dashboard-stats-grid">
         <StatCard
           label="Days to CBLEL"
           value={daysToBoard}
@@ -914,13 +902,7 @@ export default function Dashboard({
         >
           Milestones
         </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-            gap: 8,
-          }}
-        >
+        <div className="dashboard-milestones-grid">
           {milestones.map((m) => {
             const days = getDaysUntil(new Date(m.dateStr));
             const done = days < 0;
@@ -982,11 +964,13 @@ export default function Dashboard({
         }}
       >
         <div
+          className="flex-col-mobile"
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             marginBottom: 12,
+            gap: 8,
           }}
         >
           <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>
@@ -1079,18 +1063,20 @@ export default function Dashboard({
         }}
       >
         <div
+          className="flex-col-mobile"
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             marginBottom: 12,
+            gap: 8,
           }}
         >
           <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>
             Mock exam scores — last 30 days
           </span>
           {scores.length > 0 && (
-            <div style={{ display: "flex", gap: 10 }}>
+            <div className="flex-col-mobile" style={{ display: "flex", gap: 10 }}>
               {[
                 { label: "Avg", value: avgScore },
                 { label: "Best", value: bestScore },
@@ -1114,7 +1100,7 @@ export default function Dashboard({
           )}
         </div>
         <MiniLineChart scores={scores} />
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <div className="responsive-modal-grid" style={{ marginTop: 12 }}>
           {[
             {
               label: "90–100",
