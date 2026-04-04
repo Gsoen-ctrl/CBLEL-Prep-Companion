@@ -253,7 +253,7 @@ export default function Onboarding({
               ))}
             </div>
 
-            <div style={{ display: "flex", gap: 12 }}>
+            <div className="flex-col-mobile" style={{ display: "flex", gap: 12 }}>
               <button
                 onClick={() => setStep(1)}
                 style={{
@@ -394,7 +394,7 @@ export default function Onboarding({
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: 12 }}>
+            <div className="flex-col-mobile" style={{ display: "flex", gap: 12 }}>
               <button
                 onClick={() => setStep(2)}
                 style={{

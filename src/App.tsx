@@ -555,6 +555,7 @@ export default function App() {
 
   return (
     <div
+      className="app-container"
       style={{
         minHeight: "100vh",
         display: "flex",
@@ -562,6 +563,7 @@ export default function App() {
         background: "var(--cream)",
         color: "var(--ink)",
         transition: "background 0.2s, color 0.2s",
+        position: "relative",
       }}
     >
       {!tourSeen && (
