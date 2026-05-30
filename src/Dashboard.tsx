@@ -764,11 +764,8 @@ export default function Dashboard({
 
       {/* stat cards */}
       <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-          gap: 10,
-        }}
+        className="dashboard-stats-grid-4"
+        style={{ gap: 10, marginBottom: 24 }}
       >
         <StatCard
           label="Days to CBLEL"
@@ -917,13 +914,7 @@ export default function Dashboard({
         >
           Milestones
         </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-            gap: 8,
-          }}
-        >
+        <div className="dashboard-stats-grid-4" style={{ gap: 8 }}>
           {milestones.map((m) => {
             const days = getDaysUntil(new Date(m.dateStr));
             const done = days < 0;

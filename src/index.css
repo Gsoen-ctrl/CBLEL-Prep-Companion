@@ -96,3 +96,134 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   filter: var(--ink) brightness(0.5);
   cursor: pointer;
 }
+
+/* Mobile Drawer Styles */
+.mobile-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 250px;
+  background: var(--cream);
+  border-right: 1px solid var(--cream-border);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+  z-index: 100;
+}
+
+.mobile-drawer.open {
+  transform: translateX(0);
+}
+
+.overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 50;
+}
+
+.overlay.open {
+  display: block;
+}
+
+.hamburger-btn {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--ink);
+  margin-right: 12px;
+}
+
+/* Responsive visibility */
+@media (max-width: 768px) {
+  .hamburger-btn {
+    display: block;
+  }
+  .desktop-tabs {
+    display: none !important;
+  }
+}
+
+/* Dashboard Responsive Grids */
+.dashboard-stats-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 768px) {
+  .dashboard-stats-grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dashboard-split-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.dashboard-split-left {
+  flex: 2;
+}
+
+.dashboard-split-right {
+  flex: 1;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-split-layout {
+    flex-direction: column;
+  }
+  .dashboard-split-left,
+  .dashboard-split-right {
+    width: 100%;
+  }
+}
+
+/* MockExam Responsive Layout */
+.mock-exam-split {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.mock-exam-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+}
+
+.mock-exam-content {
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .mock-exam-split {
+    flex-direction: column;
+  }
+  .mock-exam-sidebar {
+    width: 100%;
+  }
+}
+
+.onboarding-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+
+@media (max-width: 768px) {
+  .onboarding-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}

@@ -249,6 +249,7 @@ export default function App() {
   const [today] = useState(() => new Date());
   const [viewDate, setViewDate] = useState(() => new Date());
   const [checks, setChecks] = useState<Record<string, boolean>>({});
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "dashboard" | "practice" | "checklist" | "milestones" | "subjects"
   >("dashboard");
@@ -500,6 +501,82 @@ export default function App() {
         transition: "background 0.2s, color 0.2s",
       }}
     >
+      {/* ── mobile drawer ── */}
+      <div
+        className={`overlay ${sidebarOpen ? "open" : ""}`}
+        onClick={() => setSidebarOpen(false)}
+      ></div>
+      <aside className={`mobile-drawer ${sidebarOpen ? "open" : ""}`}>
+        <div
+          style={{
+            padding: "20px",
+            borderBottom: "1px solid var(--cream-border)",
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: "calc(20px * var(--scale, 1))",
+              color: "var(--ink)",
+            }}
+          >
+            {userName}'s Boards
+          </div>
+          <div
+            style={{
+              fontSize: "calc(11px * var(--scale, 1))",
+              color: "var(--ink-faint)",
+              marginTop: 4,
+            }}
+          >
+            CBLEL {examDate.getFullYear()} Roadmap
+          </div>
+        </div>
+        <nav
+          style={{
+            padding: "12px 0",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          {(
+            [
+              "dashboard",
+              "practice",
+              "checklist",
+              "milestones",
+              "subjects",
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => {
+                setActiveTab(tab);
+                setSidebarOpen(false);
+              }}
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "calc(14px * var(--scale, 1))",
+                padding: "12px 20px",
+                background:
+                  activeTab === tab ? "var(--cream-dark)" : "transparent",
+                border: "none",
+                textAlign: "left",
+                color: activeTab === tab ? "var(--ink)" : "var(--ink-muted)",
+                cursor: "pointer",
+                fontWeight: activeTab === tab ? 500 : 400,
+                textTransform: "capitalize",
+                borderLeft:
+                  activeTab === tab
+                    ? "3px solid var(--ink)"
+                    : "3px solid transparent",
+              }}
+            >
+              {tab}
+            </button>
+          ))}
+        </nav>
+      </aside>
       {!tourSeen && (
         <TourOverlay
           onDismiss={() => {
@@ -520,25 +597,33 @@ export default function App() {
           gap: 16,
         }}
       >
-        <div>
-          <div
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: "calc(22px * var(--scale, 1))",
-              color: "var(--ink)",
-              lineHeight: 1.2,
-            }}
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <button
+            className="hamburger-btn"
+            onClick={() => setSidebarOpen(true)}
           >
-            {userName}'s Boards
-          </div>
-          <div
-            style={{
-              fontSize: "calc(12px * var(--scale, 1))",
-              color: "var(--ink-faint)",
-              marginTop: 2,
-            }}
-          >
-            CBLEL {examDate.getFullYear()} · The Licensed Librarian Roadmap
+            ☰
+          </button>
+          <div>
+            <div
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: "calc(22px * var(--scale, 1))",
+                color: "var(--ink)",
+                lineHeight: 1.2,
+              }}
+            >
+              {userName}'s Boards
+            </div>
+            <div
+              style={{
+                fontSize: "calc(12px * var(--scale, 1))",
+                color: "var(--ink-faint)",
+                marginTop: 2,
+              }}
+            >
+              CBLEL {examDate.getFullYear()} · The Licensed Librarian Roadmap
+            </div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -820,6 +905,7 @@ export default function App() {
 
       {/* ── tabs ── */}
       <div
+        className="desktop-tabs"
         style={{
           display: "flex",
           borderBottom: "1px solid var(--cream-border)",
