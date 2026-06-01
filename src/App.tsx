@@ -317,6 +317,9 @@ export default function App() {
   const [enableStreak, setEnableStreak] = useState<boolean>(() =>
     loadJSON("enableStreak", true),
   );
+  const [enablePomodoro, setEnablePomodoro] = useState<boolean>(() =>
+    loadJSON("enablePomodoro", true),
+  );
 
   function handleStudyAnswer(correct: boolean) {
     if (!enableStreak) return;
@@ -2032,6 +2035,11 @@ export default function App() {
                 saveJSON("studyStreak", 0);
               }
             }}
+            enablePomodoro={enablePomodoro}
+            setEnablePomodoro={(val: boolean) => {
+              setEnablePomodoro(val);
+              saveJSON("enablePomodoro", val);
+            }}
           />
         )}
 
@@ -2045,7 +2053,9 @@ export default function App() {
         )}
       </main>
 
-      {activeTab !== "study" && <Pomodoro />}
+      {enablePomodoro && activeTab !== "study" && activeTab !== "practice" && (
+        <Pomodoro />
+      )}
       <BottomNav
         activeTab={activeTab}
         setActiveTab={setActiveTab}

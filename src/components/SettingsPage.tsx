@@ -9,6 +9,8 @@ export const SettingsPage: React.FC<{
   setFontSize: (val: "S" | "M" | "L") => void;
   enableStreak: boolean;
   setEnableStreak: (val: boolean) => void;
+  enablePomodoro: boolean;
+  setEnablePomodoro: (val: boolean) => void;
 }> = ({
   darkMode,
   setDarkMode,
@@ -18,6 +20,8 @@ export const SettingsPage: React.FC<{
   setFontSize,
   enableStreak,
   setEnableStreak,
+  enablePomodoro,
+  setEnablePomodoro,
 }) => {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -133,52 +137,108 @@ export const SettingsPage: React.FC<{
         </div>
       </div>
 
-      {/* Gamification Settings */}
+      {/* Gamification & Timer Settings */}
       <div
         style={{
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+          flexDirection: "column",
+          gap: 16,
           padding: "16px",
           background: "var(--cream-dark)",
           borderRadius: "var(--radius)",
         }}
       >
-        <span
+        <div
           style={{
-            fontSize: "calc(16px * var(--scale, 1))",
-            fontWeight: 500,
-            color: "var(--ink)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
           }}
         >
-          Study Cards Streak
-        </span>
-        <button
-          onClick={() => setEnableStreak(!enableStreak)}
-          style={{
-            width: 50,
-            height: 28,
-            borderRadius: 14,
-            background: enableStreak ? "var(--accent)" : "var(--cream-border)",
-            border: "none",
-            position: "relative",
-            cursor: "pointer",
-            transition: "background 0.2s",
-          }}
-        >
-          <div
+          <span
             style={{
-              width: 20,
-              height: 20,
-              borderRadius: "50%",
-              background: "var(--cream)",
-              position: "absolute",
-              top: 4,
-              left: enableStreak ? 26 : 4,
-              transition: "left 0.2s",
+              fontSize: "calc(16px * var(--scale, 1))",
+              fontWeight: 500,
+              color: "var(--ink)",
             }}
-          />
-        </button>
+          >
+            Study Cards Streak
+          </span>
+          <button
+            onClick={() => setEnableStreak(!enableStreak)}
+            style={{
+              width: 50,
+              height: 28,
+              borderRadius: 14,
+              background: enableStreak
+                ? "var(--accent)"
+                : "var(--cream-border)",
+              border: "none",
+              position: "relative",
+              cursor: "pointer",
+              transition: "background 0.2s",
+            }}
+          >
+            <div
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: "50%",
+                background: "var(--cream)",
+                position: "absolute",
+                top: 4,
+                left: enableStreak ? 26 : 4,
+                transition: "left 0.2s",
+              }}
+            />
+          </button>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "calc(16px * var(--scale, 1))",
+              fontWeight: 500,
+              color: "var(--ink)",
+            }}
+          >
+            Pomodoro Timer
+          </span>
+          <button
+            onClick={() => setEnablePomodoro(!enablePomodoro)}
+            style={{
+              width: 50,
+              height: 28,
+              borderRadius: 14,
+              background: enablePomodoro
+                ? "var(--accent)"
+                : "var(--cream-border)",
+              border: "none",
+              position: "relative",
+              cursor: "pointer",
+              transition: "background 0.2s",
+            }}
+          >
+            <div
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: "50%",
+                background: "var(--cream)",
+                position: "absolute",
+                top: 4,
+                left: enablePomodoro ? 26 : 4,
+                transition: "left 0.2s",
+              }}
+            />
+          </button>
+        </div>
       </div>
 
       {/* Font Size */}
