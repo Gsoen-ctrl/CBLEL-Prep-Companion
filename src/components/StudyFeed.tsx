@@ -3,19 +3,85 @@ import { generateQuestion, StudyQuestion } from "./StudyGenerator";
 import { BookOpen } from "lucide-react";
 import { loadJSON, saveJSON } from "../utils/storage";
 
+const Particles: React.FC<{ color: string; count: number }> = ({
+  color,
+  count,
+}) => {
+  const [particles, setParticles] = useState<
+    { id: number; tx: string; ty: string; size: number; duration: number }[]
+  >([]);
+
+  useEffect(() => {
+    const newParticles = Array.from({ length: count }).map((_, i) => {
+      const angle = Math.random() * Math.PI * 2;
+      // Distance can shoot anywhere from 80px up to 250px outwards in all directions
+      const distance = 80 + Math.random() * 170;
+      return {
+        id: i,
+        tx: `${Math.cos(angle) * distance}px`,
+        ty: `${Math.sin(angle) * distance}px`,
+        size: 4 + Math.random() * 8,
+        duration: 0.6 + Math.random() * 1.5,
+      };
+    });
+    setParticles(newParticles);
+  }, [count]);
+
+  return (
+    <>
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          className="particle"
+          style={
+            {
+              left: "50%",
+              top: "50%",
+              width: p.size,
+              height: p.size,
+              background: color,
+              boxShadow: `0 0 10px ${color}`,
+              animationDuration: `${p.duration}s`,
+              zIndex: -2,
+              "--tx": p.tx,
+              "--ty": p.ty,
+            } as React.CSSProperties
+          }
+        />
+      ))}
+    </>
+  );
+};
+
 interface StudyFeedProps {
   onAnswer: (correct: boolean) => void;
+  studyStreak: number;
+  enableStreak: boolean;
 }
 
-export const StudyFeed: React.FC<StudyFeedProps> = ({ onAnswer }) => {
-  const [questions, setQuestions] = useState<StudyQuestion[]>(() =>
-    loadJSON("studyFeedQuestions", []),
-  );
+export const StudyFeed: React.FC<StudyFeedProps> = ({
+  onAnswer,
+  studyStreak,
+  enableStreak,
+}) => {
+  const [questions, setQuestions] = useState<StudyQuestion[]>(() => {
+    const raw = loadJSON<StudyQuestion[]>("studyFeedQuestions", []);
+    if (raw.length > 10) {
+      return raw.slice(-10);
+    }
+    return raw;
+  });
   const [loading, setLoading] = useState(questions.length === 0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [activeIndex, setActiveIndex] = useState<number>(() =>
-    loadJSON("studyFeedActiveIndex", 0),
-  );
+  const [activeIndex, setActiveIndex] = useState<number>(() => {
+    const rawQuestions = loadJSON<StudyQuestion[]>("studyFeedQuestions", []);
+    const rawIndex = loadJSON<number>("studyFeedActiveIndex", 0);
+    if (rawQuestions.length > 10) {
+      const removedCount = rawQuestions.length - 10;
+      return Math.max(0, rawIndex - removedCount);
+    }
+    return rawIndex;
+  });
 
   useEffect(() => {
     async function init() {
@@ -74,6 +140,16 @@ export const StudyFeed: React.FC<StudyFeedProps> = ({ onAnswer }) => {
     });
 
     if (closestIndex !== activeIndex) {
+      // If we scrolled forward, check if we skipped a question
+      if (closestIndex > activeIndex) {
+        // We only care about the immediately previous question that we just left
+        const prevQuestion = questions[activeIndex];
+        if (prevQuestion && !prevQuestion.answeredLetter) {
+          // If the previous question wasn't answered, it's a skip, break the streak.
+          onAnswer(false);
+        }
+      }
+
       setActiveIndex(closestIndex);
       saveJSON("studyFeedActiveIndex", closestIndex);
     }
@@ -81,6 +157,7 @@ export const StudyFeed: React.FC<StudyFeedProps> = ({ onAnswer }) => {
     if (closestIndex >= questions.length - 2 && !loadingMoreRef.current) {
       loadingMoreRef.current = true;
       const q = await generateQuestion();
+
       setQuestions((prev) => {
         const next = [...prev, q];
         saveJSON("studyFeedQuestions", next);
@@ -98,22 +175,6 @@ export const StudyFeed: React.FC<StudyFeedProps> = ({ onAnswer }) => {
       return next;
     });
     onAnswer(correct);
-  };
-
-  const scrollToNext = () => {
-    if (containerRef.current) {
-      const el = containerRef.current;
-      const items = el.querySelectorAll(".study-feed-item");
-      if (activeIndex + 1 < items.length) {
-        const nextItem = items[activeIndex + 1] as HTMLElement;
-        const nextScrollTop =
-          nextItem.offsetTop - (el.clientHeight - nextItem.clientHeight) / 2;
-        el.scrollTo({
-          top: nextScrollTop,
-          behavior: "smooth",
-        });
-      }
-    }
   };
 
   if (loading) {
@@ -154,6 +215,7 @@ export const StudyFeed: React.FC<StudyFeedProps> = ({ onAnswer }) => {
           maxWidth: "450px",
           background: "transparent",
           overflowY: "scroll",
+          overflowX: "hidden",
           scrollSnapType: "y mandatory",
           scrollBehavior: "smooth",
           position: "relative",
@@ -169,10 +231,11 @@ export const StudyFeed: React.FC<StudyFeedProps> = ({ onAnswer }) => {
             key={`${idx}-${q.stem.slice(0, 10)}`}
             question={q}
             isActive={idx === activeIndex}
-            onAutoScroll={scrollToNext}
             onAnswer={(letter, correct) =>
               handleItemAnswer(idx, letter, correct)
             }
+            studyStreak={studyStreak}
+            enableStreak={enableStreak}
           />
         ))}
       </div>
@@ -183,19 +246,58 @@ export const StudyFeed: React.FC<StudyFeedProps> = ({ onAnswer }) => {
 interface StudyItemProps {
   question: StudyQuestion;
   isActive: boolean;
-  onAutoScroll: () => void;
   onAnswer: (letter: string, correct: boolean) => void;
+  studyStreak: number;
+  enableStreak: boolean;
+}
+
+const streakColors10to100 = [
+  "#22C55E", // 10
+  "#84CC16", // 20
+  "#C9D61A", // 30
+  "#FBBF24", // 40
+  "#F97316", // 50
+  "#EA580C", // 60
+  "#E14A12", // 70
+  "#DC3A16", // 80
+  "#D73218", // 90
+  "#D12B1A", // 100
+];
+
+const streakColors100to1000 = [
+  "#D12B1A", // 100
+  "#C62828", // 200
+  "#AD2E6C", // 300
+  "#8E44AD", // 400
+  "#6C5CE7", // 500
+  "#4C6EF5", // 600
+  "#3B82F6", // 700
+  "#2563EB", // 800
+  "#1D4ED8", // 900
+  "#1E40AF", // 1000
+];
+
+function getStreakColor(streak: number): string | null {
+  if (streak < 10) return null;
+  if (streak <= 100) {
+    const idx = Math.floor(streak / 10) - 1;
+    return streakColors10to100[Math.min(idx, 9)];
+  }
+  const idx = Math.floor(streak / 100) - 1;
+  return streakColors100to1000[Math.min(idx, 9)];
 }
 
 const StudyItem: React.FC<StudyItemProps> = ({
   question,
   isActive,
-  onAutoScroll,
   onAnswer,
+  studyStreak,
+  enableStreak,
 }) => {
   const selectedLetter = question.answeredLetter || null;
   const correctOpt = question.options.find((o: any) => o.correct);
   const isCorrect = selectedLetter === correctOpt?.letter;
+  const [showShine, setShowShine] = useState(false);
 
   const handleSelect = (letter: string) => {
     if (selectedLetter) return;
@@ -205,9 +307,18 @@ const StudyItem: React.FC<StudyItemProps> = ({
     onAnswer(letter, correct);
 
     if (correct) {
-      setTimeout(() => {
-        onAutoScroll();
-      }, 1200);
+      // Temporarily show the shine if this answer hit a checkpoint
+      const nextStreak = studyStreak + 1;
+      const willBeCheckpoint =
+        enableStreak &&
+        nextStreak >= 10 &&
+        ((nextStreak <= 100 && nextStreak % 10 === 0) ||
+          (nextStreak > 100 && nextStreak % 100 === 0));
+
+      if (willBeCheckpoint) {
+        setShowShine(true);
+        setTimeout(() => setShowShine(false), 2000);
+      }
     }
   };
 
@@ -215,30 +326,71 @@ const StudyItem: React.FC<StudyItemProps> = ({
   const isLCC = question.classificationType === "LCC";
   const isClassification = question.type === "classification";
 
+  // Calculate next streak for color anticipation
+  const nextStreak = isCorrect ? studyStreak : studyStreak;
+  const showStreakEffects = enableStreak && nextStreak >= 10;
+  const streakColor = showStreakEffects ? getStreakColor(nextStreak) : null;
+
   return (
     <div
-      className="study-feed-item"
-      style={{
-        height: "80vh",
-        width: "90%",
-        margin: "0 auto",
-        flexShrink: 0,
-        scrollSnapAlign: "center",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        padding: "24px",
-        position: "relative",
-        background: "var(--cream)",
-        borderRadius: "24px",
-        boxShadow: isActive
-          ? "0 10px 40px rgba(0,0,0,0.12)"
-          : "0 4px 12px rgba(0,0,0,0.05)",
-        transform: isActive ? "scale(1)" : "scale(0.92)",
-        opacity: isActive ? 1 : 0.6,
-        transition: "all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)",
-      }}
+      className={`study-feed-item`}
+      style={
+        {
+          height: "75vh",
+          width: "90%",
+          margin: "0 auto",
+          flexShrink: 0,
+          scrollSnapAlign: "center",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "24px",
+          position: "relative",
+          background: "var(--cream)",
+          borderRadius: "24px",
+          boxShadow: isActive
+            ? streakColor
+              ? `0 10px 50px ${streakColor}40`
+              : "0 10px 40px rgba(0,0,0,0.12)"
+            : "0 4px 12px rgba(0,0,0,0.05)",
+          transform: isActive ? "scale(1)" : "scale(0.95)",
+          opacity: isActive ? 1 : 0.75,
+          transition:
+            "background 0.5s ease-in-out, box-shadow 0.5s ease-in-out, transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)",
+          ...(streakColor ? { "--glow-color": streakColor } : {}),
+        } as React.CSSProperties
+      }
     >
+      {/* Dynamic Animated Shine Outline */}
+      {streakColor && (
+        <div className={`anim-shine ${showShine ? "active" : ""}`} />
+      )}
+
+      {/* Background Gradient Effect for streaks */}
+      {isActive && streakColor && (
+        <>
+          <div
+            className="anim-breathe"
+            style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              width: "150%",
+              height: "150%",
+              background: `radial-gradient(circle, ${streakColor}25 0%, transparent 60%)`,
+              pointerEvents: "none",
+              zIndex: -1,
+              borderRadius: "50%",
+              transition: "background 0.5s ease-in-out",
+            }}
+          />
+          <Particles
+            color={streakColor}
+            count={Math.min(50, Math.floor(nextStreak / 2))}
+          />
+        </>
+      )}
+
       <div
         style={{
           flex: 1,

@@ -314,8 +314,12 @@ export default function App() {
   const [studyStreak, setStudyStreak] = useState<number>(() =>
     loadJSON("studyStreak", 0),
   );
+  const [enableStreak, setEnableStreak] = useState<boolean>(() =>
+    loadJSON("enableStreak", true),
+  );
 
   function handleStudyAnswer(correct: boolean) {
+    if (!enableStreak) return;
     setStudyStreak((prev) => {
       const next = correct ? prev + 1 : 0;
       saveJSON("studyStreak", next);
@@ -785,6 +789,65 @@ export default function App() {
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Gamification Settings */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      borderTop: "1px solid var(--cream-border)",
+                      paddingTop: 16,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "calc(13px * var(--scale, 1))",
+                        fontWeight: 500,
+                        color: "var(--ink)",
+                      }}
+                    >
+                      Study Cards Streak
+                    </span>
+                    <button
+                      onClick={() => {
+                        const val = !enableStreak;
+                        setEnableStreak(val);
+                        saveJSON("enableStreak", val);
+                        if (!val) {
+                          setStudyStreak(0);
+                          saveJSON("studyStreak", 0);
+                        }
+                      }}
+                      style={{
+                        width: 40,
+                        height: 22,
+                        borderRadius: 12,
+                        background: enableStreak
+                          ? "var(--accent)"
+                          : "var(--cream-dark)",
+                        border: "1px solid var(--cream-border)",
+                        position: "relative",
+                        cursor: "pointer",
+                        transition: "background 0.2s",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 16,
+                          height: 16,
+                          borderRadius: "50%",
+                          background: enableStreak
+                            ? "var(--cream)"
+                            : "var(--ink-muted)",
+                          position: "absolute",
+                          top: 2,
+                          left: enableStreak ? 20 : 2,
+                          transition: "left 0.2s",
+                        }}
+                      />
+                    </button>
                   </div>
                 </div>
               )}
@@ -1960,11 +2023,26 @@ export default function App() {
             setSimpleFont={setSimpleFont}
             fontSize={fontSize}
             setFontSize={setFontSize}
+            enableStreak={enableStreak}
+            setEnableStreak={(val: boolean) => {
+              setEnableStreak(val);
+              saveJSON("enableStreak", val);
+              if (!val) {
+                setStudyStreak(0);
+                saveJSON("studyStreak", 0);
+              }
+            }}
           />
         )}
 
         {/* study */}
-        {activeTab === "study" && <StudyFeed onAnswer={handleStudyAnswer} />}
+        {activeTab === "study" && (
+          <StudyFeed
+            onAnswer={handleStudyAnswer}
+            studyStreak={studyStreak}
+            enableStreak={enableStreak}
+          />
+        )}
       </main>
 
       {activeTab !== "study" && <Pomodoro />}
@@ -1973,6 +2051,7 @@ export default function App() {
         setActiveTab={setActiveTab}
         onMoreClick={() => setIsMoreSheetOpen(true)}
         studyStreak={studyStreak}
+        enableStreak={enableStreak}
       />
       <MoreSheet
         isOpen={isMoreSheetOpen}

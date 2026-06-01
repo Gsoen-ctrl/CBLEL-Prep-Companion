@@ -6,6 +6,7 @@ interface BottomNavProps {
   setActiveTab: (tab: any) => void;
   onMoreClick: () => void;
   studyStreak?: number;
+  enableStreak?: boolean;
 }
 
 const COMPLIMENTS = [
@@ -21,14 +22,21 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   setActiveTab,
   onMoreClick,
   studyStreak = 0,
+  enableStreak = true,
 }) => {
   const prevStreak = useRef(studyStreak);
-  const [streakAnim, setStreakAnim] = useState<"subtle" | "noticeable" | null>(
-    null,
-  );
+  const [streakAnim, setStreakAnim] = useState<
+    "subtle" | "noticeable" | "shake" | null
+  >(null);
   const [tooltip, setTooltip] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!enableStreak) {
+      setTooltip(null);
+      setStreakAnim(null);
+      return;
+    }
+
     if (studyStreak > prevStreak.current) {
       if (studyStreak > 0 && studyStreak % 10 === 0) {
         setStreakAnim("noticeable");
@@ -41,9 +49,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         setStreakAnim("subtle");
         setTimeout(() => setStreakAnim(null), 600);
       }
+    } else if (studyStreak === 0 && prevStreak.current >= 10) {
+      setStreakAnim("shake");
+      setTimeout(() => setStreakAnim(null), 400);
     }
     prevStreak.current = studyStreak;
-  }, [studyStreak]);
+  }, [studyStreak, enableStreak]);
 
   return (
     <div className="bottom-nav">
@@ -72,7 +83,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         <div
           className={`study-circle ${streakAnim ? `anim-${streakAnim}` : ""}`}
         >
-          {activeTab === "study" ? (
+          {activeTab === "study" && enableStreak ? (
             <span className="streak-number">{studyStreak}</span>
           ) : (
             <Layers size={20} color="white" />

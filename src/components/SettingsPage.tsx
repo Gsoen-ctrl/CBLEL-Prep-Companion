@@ -7,6 +7,8 @@ export const SettingsPage: React.FC<{
   setSimpleFont: (val: boolean) => void;
   fontSize: "S" | "M" | "L";
   setFontSize: (val: "S" | "M" | "L") => void;
+  enableStreak: boolean;
+  setEnableStreak: (val: boolean) => void;
 }> = ({
   darkMode,
   setDarkMode,
@@ -14,6 +16,8 @@ export const SettingsPage: React.FC<{
   setSimpleFont,
   fontSize,
   setFontSize,
+  enableStreak,
+  setEnableStreak,
 }) => {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -127,6 +131,54 @@ export const SettingsPage: React.FC<{
             Fraunces
           </button>
         </div>
+      </div>
+
+      {/* Gamification Settings */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "16px",
+          background: "var(--cream-dark)",
+          borderRadius: "var(--radius)",
+        }}
+      >
+        <span
+          style={{
+            fontSize: "calc(16px * var(--scale, 1))",
+            fontWeight: 500,
+            color: "var(--ink)",
+          }}
+        >
+          Study Cards Streak
+        </span>
+        <button
+          onClick={() => setEnableStreak(!enableStreak)}
+          style={{
+            width: 50,
+            height: 28,
+            borderRadius: 14,
+            background: enableStreak ? "var(--accent)" : "var(--cream-border)",
+            border: "none",
+            position: "relative",
+            cursor: "pointer",
+            transition: "background 0.2s",
+          }}
+        >
+          <div
+            style={{
+              width: 20,
+              height: 20,
+              borderRadius: "50%",
+              background: "var(--cream)",
+              position: "absolute",
+              top: 4,
+              left: enableStreak ? 26 : 4,
+              transition: "left 0.2s",
+            }}
+          />
+        </button>
       </div>
 
       {/* Font Size */}

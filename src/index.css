@@ -369,6 +369,126 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   animation: popNoticeable 0.6s ease-in-out;
 }
 
+@keyframes streakShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-4px);
+  }
+  40%,
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+.anim-shake {
+  animation: streakShake 0.4s ease-in-out;
+}
+
+@keyframes glowPulse {
+  0% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.1);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+.anim-glow {
+  animation: glowPulse 1.2s ease-in-out infinite;
+}
+
+@property --angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes spin {
+  from {
+    --angle: 0deg;
+  }
+  to {
+    --angle: 360deg;
+  }
+}
+
+.anim-shine {
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 26px; /* slightly larger than card */
+  z-index: -1;
+  pointer-events: none;
+  background-image: conic-gradient(
+    from var(--angle),
+    transparent 70%,
+    var(--glow-color) 100%
+  );
+  animation: spin 0.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.anim-shine.active {
+  opacity: 1;
+}
+
+.anim-shine::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  background: var(--cream);
+  border-radius: 24px;
+}
+
+@keyframes breatheGradient {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.8;
+  }
+}
+
+.anim-breathe {
+  animation: breatheGradient 4s ease-in-out infinite;
+  transform-origin: center center;
+}
+
+@keyframes explodeOut {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--tx), var(--ty)) scale(0);
+    opacity: 0;
+  }
+}
+
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -2;
+  animation: explodeOut cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+}
+
 .streak-tooltip {
   position: absolute;
   bottom: 65px;

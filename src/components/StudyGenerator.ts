@@ -100,10 +100,10 @@ export async function generateQuestion(): Promise<StudyQuestion> {
       let options = [];
 
       if (askForCode) {
-        stem = `What is the ${classType} subclass for "${target.description}"?`;
+        stem = `What is the ${classType} code for "${target.description}"?`;
         options = selected.map((s) => s.code);
       } else {
-        stem = `What does the ${classType} subclass "${target.code}" represent?`;
+        stem = `What does the ${classType} code "${target.code}" represent?`;
         options = selected.map((s) => s.description);
       }
 
