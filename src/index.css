@@ -23,6 +23,9 @@
   --red-bg: #f5e8e8;
   --blue: #2c4a7c;
   --blue-bg: #e8edf5;
+  --orange: #c97a3a;
+  --orange-light: #e5a870;
+  --orange-bg: #f4e4d1;
   --font-display: "Instrument Serif", Georgia, serif;
   --font-body: "DM Sans", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
@@ -61,6 +64,9 @@
   --red-bg: #2e1a1a;
   --blue: #7a9fcc;
   --blue-bg: #1a2340;
+  --orange: #e5a870;
+  --orange-light: #c97a3a;
+  --orange-bg: #2d1f0f;
 }
 
 html,
@@ -281,11 +287,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border: none;
   color: var(--ink-faint);
   cursor: pointer;
-  transition: color 0.2s;
+  transition: all 0.3s cubic-bezier(0.23, 1, 0.320, 1);
+  animation: navItemAppear 0.4s ease-out;
 }
 
 .nav-item.active {
   color: var(--accent);
+  transform: scale(1.05);
 }
 
 .nav-item.study-btn {
@@ -296,17 +304,63 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .study-circle {
   width: 48px;
   height: 48px;
-  background: var(--green);
+  background: var(--orange);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 10px rgba(61, 107, 79, 0.3);
-  transition: transform 0.2s;
+  box-shadow: 0 4px 10px rgba(201, 122, 58, 0.3);
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.320, 1);
+}
+
+.nav-item.study-btn.active .study-circle {
+  box-shadow: 0 8px 16px rgba(201, 122, 58, 0.4);
+  transform: scale(1.08);
 }
 
 .study-circle:active {
   transform: scale(0.95);
+}
+
+/* Screen Transition Animation */
+@keyframes screenSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes navItemAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* More Bottom Sheet */

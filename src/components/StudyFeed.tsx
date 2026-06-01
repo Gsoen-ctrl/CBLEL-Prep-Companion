@@ -7,6 +7,8 @@ export const StudyFeed: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>();
+  const isSnapScrollingRef = useRef(false);
 
   useEffect(() => {
     async function init() {
@@ -23,8 +25,11 @@ export const StudyFeed: React.FC = () => {
 
   const handleScroll = async (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
-    const index = Math.round(el.scrollTop / el.clientHeight);
-    if (index !== activeIndex) {
+    const cardHeight = el.clientHeight * 0.75;
+    const scrollPos = el.scrollTop + el.clientHeight / 2;
+    const index = Math.floor(scrollPos / cardHeight);
+
+    if (index !== activeIndex && index >= 0 && index < questions.length) {
       setActiveIndex(index);
     }
 
@@ -36,15 +41,46 @@ export const StudyFeed: React.FC = () => {
     }
   };
 
+  const handleScrollEnd = () => {
+    if (containerRef.current && !isSnapScrollingRef.current) {
+      const el = containerRef.current;
+      const cardHeight = el.clientHeight * 0.75;
+      const snapTarget = activeIndex * cardHeight;
+
+      isSnapScrollingRef.current = true;
+      el.scrollTo({
+        top: snapTarget,
+        behavior: "smooth",
+      });
+
+      setTimeout(() => {
+        isSnapScrollingRef.current = false;
+      }, 500);
+    }
+  };
+
   const scrollToNext = () => {
     if (containerRef.current) {
       const el = containerRef.current;
-      const nextScrollTop = (activeIndex + 1) * el.clientHeight;
+      const cardHeight = el.clientHeight * 0.75;
+      const nextScrollTop = (activeIndex + 1) * cardHeight;
+      isSnapScrollingRef.current = true;
       el.scrollTo({
         top: nextScrollTop,
         behavior: "smooth",
       });
+      setTimeout(() => {
+        isSnapScrollingRef.current = false;
+      }, 500);
     }
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+
+    scrollTimeoutRef.current = setTimeout(() => {
+      handleScrollEnd();
+    }, 150);
   };
 
   if (loading) {
@@ -79,16 +115,20 @@ export const StudyFeed: React.FC = () => {
         className="study-feed-container"
         ref={containerRef}
         onScroll={handleScroll}
+        onWheel={handleWheel}
         style={{
           height: "100%",
           width: "100%",
           maxWidth: "450px",
-          background: "var(--cream)",
+          background: "var(--cream-dark)",
           overflowY: "scroll",
-          scrollSnapType: "y mandatory",
           scrollBehavior: "smooth",
-          boxShadow: "0 0 40px rgba(0,0,0,0.08)",
           position: "relative",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          paddingTop: "calc(12.5% + 20px)",
+          paddingBottom: "calc(12.5% + 20px)",
         }}
       >
         {questions.map((q, idx) => (
@@ -97,6 +137,8 @@ export const StudyFeed: React.FC = () => {
             question={q}
             isActive={idx === activeIndex}
             onAutoScroll={scrollToNext}
+            isNextVisible={idx === activeIndex + 1}
+            isPrevVisible={idx === activeIndex - 1}
           />
         ))}
       </div>
@@ -108,12 +150,16 @@ interface StudyItemProps {
   question: StudyQuestion;
   isActive: boolean;
   onAutoScroll: () => void;
+  isNextVisible: boolean;
+  isPrevVisible: boolean;
 }
 
 const StudyItem: React.FC<StudyItemProps> = ({
   question,
   isActive,
   onAutoScroll,
+  isNextVisible,
+  isPrevVisible,
 }) => {
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
@@ -130,7 +176,7 @@ const StudyItem: React.FC<StudyItemProps> = ({
     if (correct) {
       setTimeout(() => {
         onAutoScroll();
-      }, 10000);
+      }, 2000);
     }
   };
 
@@ -138,18 +184,33 @@ const StudyItem: React.FC<StudyItemProps> = ({
   const isLCC = question.classificationType === "LCC";
   const isClassification = question.type === "classification";
 
+  const scale = isActive ? 1 : isPrevVisible || isNextVisible ? 0.88 : 0.75;
+  const translateY = isPrevVisible ? -120 : isNextVisible ? 120 : 0;
+  const opacity = isActive ? 1 : isPrevVisible || isNextVisible ? 0.6 : 0.3;
+
   return (
     <div
-      className="study-feed-item"
       style={{
-        height: "100%",
+        height: "75%",
         width: "100%",
-        scrollSnapAlign: "start",
+        maxWidth: "380px",
+        flexShrink: 0,
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
         padding: "24px",
         position: "relative",
+        background: "var(--cream)",
+        borderRadius: "var(--radius)",
+        boxShadow: isActive
+          ? "0 20px 40px rgba(0,0,0,0.12)"
+          : "0 8px 20px rgba(0,0,0,0.06)",
+        transform: `scale(${scale}) translateY(${translateY}px)`,
+        opacity: opacity,
+        transition: "all 0.4s cubic-bezier(0.23, 1, 0.320, 1)",
+        pointerEvents: isActive ? "auto" : "none",
+        userSelect: isActive ? "auto" : "none",
+        marginBottom: "20px",
       }}
     >
       <div
@@ -158,6 +219,7 @@ const StudyItem: React.FC<StudyItemProps> = ({
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
+          overflow: "auto",
         }}
       >
         {/* Topic Tag */}
@@ -291,21 +353,24 @@ const StudyItem: React.FC<StudyItemProps> = ({
       </div>
 
       {/* Scroll Hint */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: "calc(20px + env(safe-area-inset-bottom))",
-          left: 0,
-          right: 0,
-          textAlign: "center",
-          color: "var(--ink-faint)",
-          fontSize: "calc(12px * var(--scale, 1))",
-          opacity: selectedLetter ? 1 : 0.5,
-          transition: "opacity 0.3s",
-        }}
-      >
-        Swipe up for next
-      </div>
+      {isActive && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: "20px",
+            left: 0,
+            right: 0,
+            textAlign: "center",
+            color: "var(--ink-faint)",
+            fontSize: "calc(12px * var(--scale, 1))",
+            opacity: selectedLetter ? 1 : 0.5,
+            transition: "opacity 0.3s",
+            animation: "pulse 2s ease-in-out infinite",
+          }}
+        >
+          Swipe up for next
+        </div>
+      )}
     </div>
   );
 };

@@ -904,6 +904,7 @@ export default function App() {
             activeTab === "dashboard" || activeTab === "practice"
               ? 0
               : "20px 24px",
+          animation: "screenSlideIn 0.35s cubic-bezier(0.23, 1, 0.320, 1)",
         }}
       >
         {activeTab === "dashboard" && (
@@ -1955,7 +1956,7 @@ export default function App() {
         {activeTab === "study" && <StudyFeed />}
       </main>
 
-      <Pomodoro />
+      {activeTab !== "study" && <Pomodoro />}
       <BottomNav
         activeTab={activeTab}
         setActiveTab={setActiveTab}
