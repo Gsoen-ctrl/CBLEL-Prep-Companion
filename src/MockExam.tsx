@@ -1148,10 +1148,10 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
         let correctText = "";
 
         if (isAskCode) {
-          stem = `What is the ${type} number/subclass for "${item.description}"?`;
+          stem = `What is the ${type} subclass for "${item.description}"?`;
           correctText = item.code;
         } else {
-          stem = `What subject does the ${type} number/subclass "${item.code}" represent?`;
+          stem = `What subject does the ${type} subclass "${item.code}" represent?`;
           correctText = item.description;
         }
 

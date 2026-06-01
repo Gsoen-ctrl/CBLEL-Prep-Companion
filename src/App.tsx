@@ -8,22 +8,7 @@ import { BottomNav } from "./components/BottomNav";
 import { MoreSheet } from "./components/MoreSheet";
 import { SettingsPage } from "./components/SettingsPage";
 import { StudyFeed } from "./components/StudyFeed";
-
-// ── storage state helpers
-export function loadJSON<T>(key: string, fallback: T): T {
-  try {
-    const v = localStorage.getItem(key);
-    return v ? JSON.parse(v) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-export function saveJSON(key: string, val: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(val));
-  } catch {}
-}
+import { loadJSON, saveJSON } from "./utils/storage";
 
 // ── default milestones
 const DEFAULT_MILESTONES = [
@@ -326,6 +311,18 @@ export default function App() {
     "view",
   );
 
+  const [studyStreak, setStudyStreak] = useState<number>(() =>
+    loadJSON("studyStreak", 0),
+  );
+
+  function handleStudyAnswer(correct: boolean) {
+    setStudyStreak((prev) => {
+      const next = correct ? prev + 1 : 0;
+      saveJSON("studyStreak", next);
+      return next;
+    });
+  }
+
   const dateKey = storageKey(viewDate);
 
   useEffect(() => {
@@ -521,7 +518,9 @@ export default function App() {
     <div
       className="app-container"
       style={{
-        minHeight: "100vh",
+        height: "100dvh",
+        width: "100%",
+        overflow: "hidden",
         display: "flex",
         flexDirection: "column",
         background: "var(--cream)",
@@ -539,372 +538,384 @@ export default function App() {
       )}
 
       {/* ── header ── */}
-      <header
-        style={{
-          padding: "14px 24px",
-          borderBottom: "1px solid var(--cream-border)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 16,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center" }}>
-          <div>
-            <div
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: "calc(22px * var(--scale, 1))",
-                color: "var(--ink)",
-                lineHeight: 1.2,
-              }}
-            >
-              {userName}'s Boards
-            </div>
-            <div
-              style={{
-                fontSize: "calc(12px * var(--scale, 1))",
-                color: "var(--ink-faint)",
-                marginTop: 2,
-              }}
-            >
-              CBLEL {examDate.getFullYear()} · The Licensed Librarian Roadmap
-            </div>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {!restDay && (
-            <span
-              style={{
-                fontSize: "calc(11px * var(--scale, 1))",
-                fontWeight: 500,
-                padding: "2px 8px",
-                background: "var(--accent-bg)",
-                color: "var(--accent)",
-                borderRadius: 4,
-              }}
-            >
-              {short}
-            </span>
-          )}
-          {restDay && (
-            <span
-              style={{
-                fontSize: "calc(11px * var(--scale, 1))",
-                fontWeight: 500,
-                padding: "2px 8px",
-                background: "var(--cream-dark)",
-                color: "var(--ink-muted)",
-                borderRadius: 4,
-              }}
-            >
-              Rest day
-            </span>
-          )}
-          <div className="desktop-settings" style={{ position: "relative" }}>
-            <button
-              onClick={() => setShowSettings((s) => !s)}
-              title="Settings"
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: "var(--radius-sm)",
-                border: "1px solid var(--cream-border)",
-                background: showSettings
-                  ? "var(--cream-border)"
-                  : "var(--cream-dark)",
-                cursor: "pointer",
-                fontSize: "calc(15px * var(--scale, 1))",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--ink-muted)",
-                transition: "background 0.15s",
-              }}
-            >
-              ⚙
-            </button>
-            {showSettings && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "100%",
-                  right: 0,
-                  marginTop: 8,
-                  width: 220,
-                  background: "var(--cream)",
-                  border: "1px solid var(--cream-border)",
-                  borderRadius: "var(--radius)",
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                  padding: "16px",
-                  zIndex: 1000,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 16,
-                }}
-              >
-                {/* Theme Toggle */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: "calc(13px * var(--scale, 1))",
-                      fontWeight: 500,
-                      color: "var(--ink)",
-                    }}
-                  >
-                    Dark Mode
-                  </span>
-                  <button
-                    onClick={() => setDarkMode(!darkMode)}
-                    style={{
-                      width: 40,
-                      height: 22,
-                      borderRadius: 12,
-                      background: darkMode
-                        ? "var(--accent)"
-                        : "var(--cream-dark)",
-                      border: "1px solid var(--cream-border)",
-                      position: "relative",
-                      cursor: "pointer",
-                      transition: "background 0.2s",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 16,
-                        height: 16,
-                        borderRadius: "50%",
-                        background: darkMode
-                          ? "var(--cream)"
-                          : "var(--ink-muted)",
-                        position: "absolute",
-                        top: 2,
-                        left: darkMode ? 20 : 2,
-                        transition: "left 0.2s",
-                      }}
-                    />
-                  </button>
-                </div>
-
-                {/* Font Style */}
-                <div>
-                  <div
-                    style={{
-                      fontSize: "calc(12px * var(--scale, 1))",
-                      color: "var(--ink-muted)",
-                      marginBottom: 6,
-                    }}
-                  >
-                    Font Style
-                  </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button
-                      onClick={() => setSimpleFont(false)}
-                      style={{
-                        flex: 1,
-                        padding: "6px",
-                        fontSize: "calc(12px * var(--scale, 1))",
-                        borderRadius: "var(--radius-sm)",
-                        border: "1px solid var(--cream-border)",
-                        background: !simpleFont
-                          ? "var(--accent-bg)"
-                          : "var(--cream-dark)",
-                        color: !simpleFont
-                          ? "var(--accent)"
-                          : "var(--ink-muted)",
-                        fontFamily: "'Instrument Serif', Georgia, serif",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Serif
-                    </button>
-                    <button
-                      onClick={() => setSimpleFont(true)}
-                      style={{
-                        flex: 1,
-                        padding: "6px",
-                        fontSize: "calc(12px * var(--scale, 1))",
-                        borderRadius: "var(--radius-sm)",
-                        border: "1px solid var(--cream-border)",
-                        background: simpleFont
-                          ? "var(--accent-bg)"
-                          : "var(--cream-dark)",
-                        color: simpleFont
-                          ? "var(--accent)"
-                          : "var(--ink-muted)",
-                        fontFamily: "'Fraunces', Georgia, serif",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Fraunces
-                    </button>
-                  </div>
-                </div>
-
-                {/* Font Size */}
-                <div>
-                  <div
-                    style={{
-                      fontSize: "calc(12px * var(--scale, 1))",
-                      color: "var(--ink-muted)",
-                      marginBottom: 6,
-                    }}
-                  >
-                    Text Size
-                  </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    {(["S", "M", "L"] as const).map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => setFontSize(s)}
-                        style={{
-                          flex: 1,
-                          padding: "6px",
-                          fontSize: `calc(${s === "S" ? 11 : s === "M" ? 13 : 15}px * var(--scale, 1))`,
-                          borderRadius: "var(--radius-sm)",
-                          border: "1px solid var(--cream-border)",
-                          background:
-                            fontSize === s
-                              ? "var(--accent-bg)"
-                              : "var(--cream-dark)",
-                          color:
-                            fontSize === s
-                              ? "var(--accent)"
-                              : "var(--ink-muted)",
-                          cursor: "pointer",
-                          fontFamily: "var(--font-body)",
-                        }}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* ── date nav ── */}
-      {activeTab !== "dashboard" && activeTab !== "practice" && (
-        <div
+      {activeTab !== "study" && (
+        <header
           style={{
-            padding: "12px 24px",
+            padding: "14px 24px",
+            borderBottom: "1px solid var(--cream-border)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            borderBottom: "1px solid var(--cream-border)",
+            gap: 16,
           }}
         >
-          <button onClick={() => shiftDate(-1)} style={navBtn}>
-            ←
-          </button>
-          <div style={{ textAlign: "center" }}>
-            <div
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: "calc(16px * var(--scale, 1))",
-                color: "var(--ink)",
-              }}
-            >
-              {formatDate(viewDate)}
-            </div>
-            {!isToday ? (
-              <button
-                onClick={() => setViewDate(new Date())}
-                style={{
-                  fontSize: "calc(11px * var(--scale, 1))",
-                  color: "var(--accent)",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  marginTop: 2,
-                  fontFamily: "var(--font-body)",
-                }}
-              >
-                Back to today
-              </button>
-            ) : (
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <div>
               <div
                 style={{
-                  fontSize: "calc(11px * var(--scale, 1))",
+                  fontFamily: "var(--font-display)",
+                  fontSize: "calc(22px * var(--scale, 1))",
+                  color: "var(--ink)",
+                  lineHeight: 1.2,
+                }}
+              >
+                {userName}'s Boards
+              </div>
+              <div
+                style={{
+                  fontSize: "calc(12px * var(--scale, 1))",
                   color: "var(--ink-faint)",
                   marginTop: 2,
                 }}
               >
-                Today
+                CBLEL {examDate.getFullYear()} · The Licensed Librarian Roadmap
               </div>
-            )}
+            </div>
           </div>
-          <button onClick={() => shiftDate(1)} style={navBtn}>
-            →
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {!restDay && (
+              <span
+                style={{
+                  fontSize: "calc(11px * var(--scale, 1))",
+                  fontWeight: 500,
+                  padding: "2px 8px",
+                  background: "var(--accent-bg)",
+                  color: "var(--accent)",
+                  borderRadius: 4,
+                }}
+              >
+                {short}
+              </span>
+            )}
+            {restDay && (
+              <span
+                style={{
+                  fontSize: "calc(11px * var(--scale, 1))",
+                  fontWeight: 500,
+                  padding: "2px 8px",
+                  background: "var(--cream-dark)",
+                  color: "var(--ink-muted)",
+                  borderRadius: 4,
+                }}
+              >
+                Rest day
+              </span>
+            )}
+            <div className="desktop-settings" style={{ position: "relative" }}>
+              <button
+                onClick={() => setShowSettings((s) => !s)}
+                title="Settings"
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid var(--cream-border)",
+                  background: showSettings
+                    ? "var(--cream-border)"
+                    : "var(--cream-dark)",
+                  cursor: "pointer",
+                  fontSize: "calc(15px * var(--scale, 1))",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--ink-muted)",
+                  transition: "background 0.15s",
+                }}
+              >
+                ⚙
+              </button>
+              {showSettings && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    right: 0,
+                    marginTop: 8,
+                    width: 220,
+                    background: "var(--cream)",
+                    border: "1px solid var(--cream-border)",
+                    borderRadius: "var(--radius)",
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                    padding: "16px",
+                    zIndex: 1000,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 16,
+                  }}
+                >
+                  {/* Theme Toggle */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "calc(13px * var(--scale, 1))",
+                        fontWeight: 500,
+                        color: "var(--ink)",
+                      }}
+                    >
+                      Dark Mode
+                    </span>
+                    <button
+                      onClick={() => setDarkMode(!darkMode)}
+                      style={{
+                        width: 40,
+                        height: 22,
+                        borderRadius: 12,
+                        background: darkMode
+                          ? "var(--accent)"
+                          : "var(--cream-dark)",
+                        border: "1px solid var(--cream-border)",
+                        position: "relative",
+                        cursor: "pointer",
+                        transition: "background 0.2s",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 16,
+                          height: 16,
+                          borderRadius: "50%",
+                          background: darkMode
+                            ? "var(--cream)"
+                            : "var(--ink-muted)",
+                          position: "absolute",
+                          top: 2,
+                          left: darkMode ? 20 : 2,
+                          transition: "left 0.2s",
+                        }}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Font Style */}
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "calc(12px * var(--scale, 1))",
+                        color: "var(--ink-muted)",
+                        marginBottom: 6,
+                      }}
+                    >
+                      Font Style
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        onClick={() => setSimpleFont(false)}
+                        style={{
+                          flex: 1,
+                          padding: "6px",
+                          fontSize: "calc(12px * var(--scale, 1))",
+                          borderRadius: "var(--radius-sm)",
+                          border: "1px solid var(--cream-border)",
+                          background: !simpleFont
+                            ? "var(--accent-bg)"
+                            : "var(--cream-dark)",
+                          color: !simpleFont
+                            ? "var(--accent)"
+                            : "var(--ink-muted)",
+                          fontFamily: "'Instrument Serif', Georgia, serif",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Serif
+                      </button>
+                      <button
+                        onClick={() => setSimpleFont(true)}
+                        style={{
+                          flex: 1,
+                          padding: "6px",
+                          fontSize: "calc(12px * var(--scale, 1))",
+                          borderRadius: "var(--radius-sm)",
+                          border: "1px solid var(--cream-border)",
+                          background: simpleFont
+                            ? "var(--accent-bg)"
+                            : "var(--cream-dark)",
+                          color: simpleFont
+                            ? "var(--accent)"
+                            : "var(--ink-muted)",
+                          fontFamily: "'Fraunces', Georgia, serif",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Fraunces
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Font Size */}
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "calc(12px * var(--scale, 1))",
+                        color: "var(--ink-muted)",
+                        marginBottom: 6,
+                      }}
+                    >
+                      Text Size
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {(["S", "M", "L"] as const).map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => setFontSize(s)}
+                          style={{
+                            flex: 1,
+                            padding: "6px",
+                            fontSize: `calc(${s === "S" ? 11 : s === "M" ? 13 : 15}px * var(--scale, 1))`,
+                            borderRadius: "var(--radius-sm)",
+                            border: "1px solid var(--cream-border)",
+                            background:
+                              fontSize === s
+                                ? "var(--accent-bg)"
+                                : "var(--cream-dark)",
+                            color:
+                              fontSize === s
+                                ? "var(--accent)"
+                                : "var(--ink-muted)",
+                            cursor: "pointer",
+                            fontFamily: "var(--font-body)",
+                          }}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+      )}
+
+      {/* ── date nav ── */}
+      {activeTab !== "dashboard" &&
+        activeTab !== "practice" &&
+        activeTab !== "study" && (
+          <div
+            style={{
+              padding: "12px 24px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              borderBottom: "1px solid var(--cream-border)",
+            }}
+          >
+            <button onClick={() => shiftDate(-1)} style={navBtn}>
+              ←
+            </button>
+            <div style={{ textAlign: "center" }}>
+              <div
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: "calc(16px * var(--scale, 1))",
+                  color: "var(--ink)",
+                }}
+              >
+                {formatDate(viewDate)}
+              </div>
+              {!isToday ? (
+                <button
+                  onClick={() => setViewDate(new Date())}
+                  style={{
+                    fontSize: "calc(11px * var(--scale, 1))",
+                    color: "var(--accent)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    marginTop: 2,
+                    fontFamily: "var(--font-body)",
+                  }}
+                >
+                  Back to today
+                </button>
+              ) : (
+                <div
+                  style={{
+                    fontSize: "calc(11px * var(--scale, 1))",
+                    color: "var(--ink-faint)",
+                    marginTop: 2,
+                  }}
+                >
+                  Today
+                </div>
+              )}
+            </div>
+            <button onClick={() => shiftDate(1)} style={navBtn}>
+              →
+            </button>
+          </div>
+        )}
+
+      {/* ── tabs ── */}
+      {activeTab !== "study" && (
+        <div
+          className="desktop-tabs"
+          style={{
+            display: "flex",
+            borderBottom: "1px solid var(--cream-border)",
+            padding: "0 24px",
+            overflowX: "auto",
+          }}
+        >
+          {(
+            [
+              "dashboard",
+              "practice",
+              "study",
+              "checklist",
+              "milestones",
+              "subjects",
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "calc(13px * var(--scale, 1))",
+                padding: "10px 14px",
+                background: "none",
+                border: "none",
+                whiteSpace: "nowrap",
+                borderBottom:
+                  activeTab === tab
+                    ? "2px solid var(--ink)"
+                    : "2px solid transparent",
+                color: activeTab === tab ? "var(--ink)" : "var(--ink-faint)",
+                cursor: "pointer",
+                fontWeight: activeTab === tab ? 500 : 400,
+                transition: "color 0.15s",
+                textTransform: "capitalize",
+              }}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
       )}
 
-      {/* ── tabs ── */}
-      <div
-        className="desktop-tabs"
-        style={{
-          display: "flex",
-          borderBottom: "1px solid var(--cream-border)",
-          padding: "0 24px",
-          overflowX: "auto",
-        }}
-      >
-        {(
-          [
-            "dashboard",
-            "practice",
-            "study",
-            "checklist",
-            "milestones",
-            "subjects",
-          ] as const
-        ).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            style={{
-              fontFamily: "var(--font-body)",
-              fontSize: "calc(13px * var(--scale, 1))",
-              padding: "10px 14px",
-              background: "none",
-              border: "none",
-              whiteSpace: "nowrap",
-              borderBottom:
-                activeTab === tab
-                  ? "2px solid var(--ink)"
-                  : "2px solid transparent",
-              color: activeTab === tab ? "var(--ink)" : "var(--ink-faint)",
-              cursor: "pointer",
-              fontWeight: activeTab === tab ? 500 : 400,
-              transition: "color 0.15s",
-              textTransform: "capitalize",
-            }}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
       {/* ── main ── */}
       <main
+        key={activeTab}
+        className="fade-in"
         style={{
           flex: 1,
-          overflowY: "auto",
+          minHeight: 0 /* crucial for nested flex scrolling */,
+          overflowY: activeTab === "study" ? "hidden" : "auto",
           padding:
-            activeTab === "dashboard" || activeTab === "practice"
+            activeTab === "dashboard" ||
+            activeTab === "practice" ||
+            activeTab === "study"
               ? 0
               : "20px 24px",
-          animation: "screenSlideIn 0.35s cubic-bezier(0.23, 1, 0.320, 1)",
+          display: activeTab === "study" ? "flex" : "block",
+          flexDirection: "column",
         }}
       >
         {activeTab === "dashboard" && (
@@ -1953,7 +1964,7 @@ export default function App() {
         )}
 
         {/* study */}
-        {activeTab === "study" && <StudyFeed />}
+        {activeTab === "study" && <StudyFeed onAnswer={handleStudyAnswer} />}
       </main>
 
       {activeTab !== "study" && <Pomodoro />}
@@ -1961,6 +1972,7 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onMoreClick={() => setIsMoreSheetOpen(true)}
+        studyStreak={studyStreak}
       />
       <MoreSheet
         isOpen={isMoreSheetOpen}

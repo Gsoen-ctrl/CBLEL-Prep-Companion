@@ -1,86 +1,119 @@
 import React, { useState, useEffect, useRef } from "react";
 import { generateQuestion, StudyQuestion } from "./StudyGenerator";
 import { BookOpen } from "lucide-react";
+import { loadJSON, saveJSON } from "../utils/storage";
 
-export const StudyFeed: React.FC = () => {
-  const [questions, setQuestions] = useState<StudyQuestion[]>([]);
-  const [loading, setLoading] = useState(true);
+interface StudyFeedProps {
+  onAnswer: (correct: boolean) => void;
+}
+
+export const StudyFeed: React.FC<StudyFeedProps> = ({ onAnswer }) => {
+  const [questions, setQuestions] = useState<StudyQuestion[]>(() =>
+    loadJSON("studyFeedQuestions", []),
+  );
+  const [loading, setLoading] = useState(questions.length === 0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>();
-  const isSnapScrollingRef = useRef(false);
+  const [activeIndex, setActiveIndex] = useState<number>(() =>
+    loadJSON("studyFeedActiveIndex", 0),
+  );
 
   useEffect(() => {
     async function init() {
-      const q1 = await generateQuestion();
-      const q2 = await generateQuestion();
-      const q3 = await generateQuestion();
-      setQuestions([q1, q2, q3]);
-      setLoading(false);
+      if (questions.length === 0) {
+        const q1 = await generateQuestion();
+        const q2 = await generateQuestion();
+        const q3 = await generateQuestion();
+        const initial = [q1, q2, q3];
+        setQuestions(initial);
+        saveJSON("studyFeedQuestions", initial);
+        setLoading(false);
+      }
     }
     init();
-  }, []);
+  }, [questions.length]);
+
+  // Restore scroll position on mount after a tiny delay to let the DOM paint
+  useEffect(() => {
+    if (!loading && containerRef.current && activeIndex > 0) {
+      setTimeout(() => {
+        if (containerRef.current) {
+          const el = containerRef.current;
+          const items = el.querySelectorAll(".study-feed-item");
+          if (activeIndex < items.length) {
+            const item = items[activeIndex] as HTMLElement;
+            const targetScroll =
+              item.offsetTop - (el.clientHeight - item.clientHeight) / 2;
+            el.scrollTo({ top: targetScroll, behavior: "instant" });
+          }
+        }
+      }, 50);
+    }
+  }, [loading]);
 
   const loadingMoreRef = useRef(false);
 
   const handleScroll = async (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
-    const cardHeight = el.clientHeight * 0.75;
-    const scrollPos = el.scrollTop + el.clientHeight / 2;
-    const index = Math.floor(scrollPos / cardHeight);
 
-    if (index !== activeIndex && index >= 0 && index < questions.length) {
-      setActiveIndex(index);
+    // Find the item closest to the center of the scroll container
+    const containerCenter = el.scrollTop + el.clientHeight / 2;
+    let closestIndex = 0;
+    let minDistance = Infinity;
+
+    Array.from(el.children).forEach((child, index) => {
+      const htmlChild = child as HTMLElement;
+      // We only care about study-feed-item nodes
+      if (htmlChild.classList.contains("study-feed-item")) {
+        const childCenter = htmlChild.offsetTop + htmlChild.clientHeight / 2;
+        const distance = Math.abs(containerCenter - childCenter);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestIndex = index;
+        }
+      }
+    });
+
+    if (closestIndex !== activeIndex) {
+      setActiveIndex(closestIndex);
+      saveJSON("studyFeedActiveIndex", closestIndex);
     }
 
-    if (index >= questions.length - 2 && !loadingMoreRef.current) {
+    if (closestIndex >= questions.length - 2 && !loadingMoreRef.current) {
       loadingMoreRef.current = true;
       const q = await generateQuestion();
-      setQuestions((prev) => [...prev, q]);
+      setQuestions((prev) => {
+        const next = [...prev, q];
+        saveJSON("studyFeedQuestions", next);
+        return next;
+      });
       loadingMoreRef.current = false;
     }
   };
 
-  const handleScrollEnd = () => {
-    if (containerRef.current && !isSnapScrollingRef.current) {
-      const el = containerRef.current;
-      const cardHeight = el.clientHeight * 0.75;
-      const snapTarget = activeIndex * cardHeight;
-
-      isSnapScrollingRef.current = true;
-      el.scrollTo({
-        top: snapTarget,
-        behavior: "smooth",
-      });
-
-      setTimeout(() => {
-        isSnapScrollingRef.current = false;
-      }, 500);
-    }
+  const handleItemAnswer = (idx: number, letter: string, correct: boolean) => {
+    setQuestions((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], answeredLetter: letter };
+      saveJSON("studyFeedQuestions", next);
+      return next;
+    });
+    onAnswer(correct);
   };
 
   const scrollToNext = () => {
     if (containerRef.current) {
       const el = containerRef.current;
-      const cardHeight = el.clientHeight * 0.75;
-      const nextScrollTop = (activeIndex + 1) * cardHeight;
-      isSnapScrollingRef.current = true;
-      el.scrollTo({
-        top: nextScrollTop,
-        behavior: "smooth",
-      });
-      setTimeout(() => {
-        isSnapScrollingRef.current = false;
-      }, 500);
+      const items = el.querySelectorAll(".study-feed-item");
+      if (activeIndex + 1 < items.length) {
+        const nextItem = items[activeIndex + 1] as HTMLElement;
+        const nextScrollTop =
+          nextItem.offsetTop - (el.clientHeight - nextItem.clientHeight) / 2;
+        el.scrollTo({
+          top: nextScrollTop,
+          behavior: "smooth",
+        });
+      }
     }
-  };
-
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-
-    scrollTimeoutRef.current = setTimeout(() => {
-      handleScrollEnd();
-    }, 150);
   };
 
   if (loading) {
@@ -115,20 +148,20 @@ export const StudyFeed: React.FC = () => {
         className="study-feed-container"
         ref={containerRef}
         onScroll={handleScroll}
-        onWheel={handleWheel}
         style={{
           height: "100%",
           width: "100%",
           maxWidth: "450px",
-          background: "var(--cream-dark)",
+          background: "transparent",
           overflowY: "scroll",
+          scrollSnapType: "y mandatory",
           scrollBehavior: "smooth",
           position: "relative",
+          paddingTop: "10vh",
+          paddingBottom: "10vh",
           display: "flex",
           flexDirection: "column",
-          alignItems: "center",
-          paddingTop: "calc(12.5% + 20px)",
-          paddingBottom: "calc(12.5% + 20px)",
+          gap: "2vh",
         }}
       >
         {questions.map((q, idx) => (
@@ -137,8 +170,9 @@ export const StudyFeed: React.FC = () => {
             question={q}
             isActive={idx === activeIndex}
             onAutoScroll={scrollToNext}
-            isNextVisible={idx === activeIndex + 1}
-            isPrevVisible={idx === activeIndex - 1}
+            onAnswer={(letter, correct) =>
+              handleItemAnswer(idx, letter, correct)
+            }
           />
         ))}
       </div>
@@ -150,33 +184,30 @@ interface StudyItemProps {
   question: StudyQuestion;
   isActive: boolean;
   onAutoScroll: () => void;
-  isNextVisible: boolean;
-  isPrevVisible: boolean;
+  onAnswer: (letter: string, correct: boolean) => void;
 }
 
 const StudyItem: React.FC<StudyItemProps> = ({
   question,
   isActive,
   onAutoScroll,
-  isNextVisible,
-  isPrevVisible,
+  onAnswer,
 }) => {
-  const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
-  const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
+  const selectedLetter = question.answeredLetter || null;
+  const correctOpt = question.options.find((o: any) => o.correct);
+  const isCorrect = selectedLetter === correctOpt?.letter;
 
   const handleSelect = (letter: string) => {
     if (selectedLetter) return;
 
-    const correctOpt = question.options.find((o: any) => o.correct);
     const correct = letter === correctOpt?.letter;
 
-    setSelectedLetter(letter);
-    setIsCorrect(correct);
+    onAnswer(letter, correct);
 
     if (correct) {
       setTimeout(() => {
         onAutoScroll();
-      }, 2000);
+      }, 1200);
     }
   };
 
@@ -184,33 +215,28 @@ const StudyItem: React.FC<StudyItemProps> = ({
   const isLCC = question.classificationType === "LCC";
   const isClassification = question.type === "classification";
 
-  const scale = isActive ? 1 : isPrevVisible || isNextVisible ? 0.88 : 0.75;
-  const translateY = isPrevVisible ? -120 : isNextVisible ? 120 : 0;
-  const opacity = isActive ? 1 : isPrevVisible || isNextVisible ? 0.6 : 0.3;
-
   return (
     <div
+      className="study-feed-item"
       style={{
-        height: "75%",
-        width: "100%",
-        maxWidth: "380px",
+        height: "80vh",
+        width: "90%",
+        margin: "0 auto",
         flexShrink: 0,
+        scrollSnapAlign: "center",
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
         padding: "24px",
         position: "relative",
         background: "var(--cream)",
-        borderRadius: "var(--radius)",
+        borderRadius: "24px",
         boxShadow: isActive
-          ? "0 20px 40px rgba(0,0,0,0.12)"
-          : "0 8px 20px rgba(0,0,0,0.06)",
-        transform: `scale(${scale}) translateY(${translateY}px)`,
-        opacity: opacity,
-        transition: "all 0.4s cubic-bezier(0.23, 1, 0.320, 1)",
-        pointerEvents: isActive ? "auto" : "none",
-        userSelect: isActive ? "auto" : "none",
-        marginBottom: "20px",
+          ? "0 10px 40px rgba(0,0,0,0.12)"
+          : "0 4px 12px rgba(0,0,0,0.05)",
+        transform: isActive ? "scale(1)" : "scale(0.92)",
+        opacity: isActive ? 1 : 0.6,
+        transition: "all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)",
       }}
     >
       <div
@@ -219,7 +245,7 @@ const StudyItem: React.FC<StudyItemProps> = ({
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
-          overflow: "auto",
+          overflowY: "auto",
         }}
       >
         {/* Topic Tag */}
@@ -353,24 +379,21 @@ const StudyItem: React.FC<StudyItemProps> = ({
       </div>
 
       {/* Scroll Hint */}
-      {isActive && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: "20px",
-            left: 0,
-            right: 0,
-            textAlign: "center",
-            color: "var(--ink-faint)",
-            fontSize: "calc(12px * var(--scale, 1))",
-            opacity: selectedLetter ? 1 : 0.5,
-            transition: "opacity 0.3s",
-            animation: "pulse 2s ease-in-out infinite",
-          }}
-        >
-          Swipe up for next
-        </div>
-      )}
+      <div
+        style={{
+          position: "absolute",
+          bottom: "16px",
+          left: 0,
+          right: 0,
+          textAlign: "center",
+          color: "var(--ink-faint)",
+          fontSize: "calc(12px * var(--scale, 1))",
+          opacity: selectedLetter ? 1 : 0.5,
+          transition: "opacity 0.3s",
+        }}
+      >
+        Swipe up for next
+      </div>
     </div>
   );
 };

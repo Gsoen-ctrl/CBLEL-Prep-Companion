@@ -60,9 +60,9 @@ export default function Pomodoro() {
 
   return (
     <div
+      className="pomodoro-container"
       style={{
         position: "fixed",
-        bottom: 24,
         right: 24,
         zIndex: 9000,
         display: "flex",

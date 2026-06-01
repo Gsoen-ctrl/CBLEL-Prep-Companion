@@ -23,9 +23,8 @@
   --red-bg: #f5e8e8;
   --blue: #2c4a7c;
   --blue-bg: #e8edf5;
-  --orange: #c97a3a;
-  --orange-light: #e5a870;
-  --orange-bg: #f4e4d1;
+  --sienna: #a0522d;
+  --sienna-bg: #f5e8e1;
   --font-display: "Instrument Serif", Georgia, serif;
   --font-body: "DM Sans", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
@@ -64,9 +63,8 @@
   --red-bg: #2e1a1a;
   --blue: #7a9fcc;
   --blue-bg: #1a2340;
-  --orange: #e5a870;
-  --orange-light: #c97a3a;
-  --orange-bg: #2d1f0f;
+  --sienna: #cd6839;
+  --sienna-bg: #3a2218;
 }
 
 html,
@@ -105,6 +103,17 @@ body {
 input[type="date"]::-webkit-calendar-picker-indicator {
   filter: var(--ink) brightness(0.5);
   cursor: pointer;
+}
+
+/* Pomodoro positioning */
+.pomodoro-container {
+  bottom: 24px;
+}
+
+@media (max-width: 768px) {
+  .pomodoro-container {
+    bottom: calc(84px + env(safe-area-inset-bottom));
+  }
 }
 
 /* Mobile Drawer Styles */
@@ -287,13 +296,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border: none;
   color: var(--ink-faint);
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.23, 1, 0.320, 1);
-  animation: navItemAppear 0.4s ease-out;
+  transition: color 0.2s;
 }
 
 .nav-item.active {
   color: var(--accent);
-  transform: scale(1.05);
 }
 
 .nav-item.study-btn {
@@ -304,63 +311,80 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .study-circle {
   width: 48px;
   height: 48px;
-  background: var(--orange);
+  background: var(--sienna);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 10px rgba(201, 122, 58, 0.3);
-  transition: all 0.2s cubic-bezier(0.23, 1, 0.320, 1);
-}
-
-.nav-item.study-btn.active .study-circle {
-  box-shadow: 0 8px 16px rgba(201, 122, 58, 0.4);
-  transform: scale(1.08);
+  box-shadow: 0 4px 10px rgba(160, 82, 45, 0.3);
+  transition: transform 0.2s;
 }
 
 .study-circle:active {
   transform: scale(0.95);
 }
 
-/* Screen Transition Animation */
-@keyframes screenSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.streak-number {
+  color: white;
+  font-family: var(--font-display);
+  font-size: calc(24px * var(--scale, 1));
+  font-weight: bold;
 }
 
-@keyframes navItemAppear {
-  from {
-    opacity: 0;
-    transform: scale(0.8);
+@keyframes popSubtle {
+  0% {
+    transform: scale(1);
   }
-  to {
-    opacity: 1;
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
     transform: scale(1);
   }
 }
 
-@keyframes pulse {
-  0%, 100% {
-    opacity: 0.5;
+@keyframes popNoticeable {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  25% {
+    transform: scale(1.3) rotate(-10deg);
   }
   50% {
-    opacity: 1;
+    transform: scale(1.3) rotate(10deg);
+  }
+  75% {
+    transform: scale(1.3) rotate(-5deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
   }
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.anim-subtle {
+  animation: popSubtle 0.3s ease-out;
+}
+
+.anim-noticeable {
+  animation: popNoticeable 0.6s ease-in-out;
+}
+
+.streak-tooltip {
+  position: absolute;
+  bottom: 65px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-light);
+  color: var(--accent);
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: calc(13px * var(--scale, 1));
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  z-index: 200;
+  pointer-events: none;
 }
 
 /* More Bottom Sheet */
@@ -409,6 +433,22 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   background: var(--cream-border);
   border-radius: 2px;
   margin: 0 auto 20px;
+}
+
+/* Fade-in animation for views */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
 }
 
 /* Hide scrollbar for Study Feed globally for Webkit/Firefox */
