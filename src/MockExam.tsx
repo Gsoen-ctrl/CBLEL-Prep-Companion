@@ -5,8 +5,8 @@ import { quizCompletedKey } from "./Dashboard";
 // ── types
 export type SessionType = "exam" | "quiz" | "custom" | "classification";
 
-type Option = { letter: string; text: string; correct: boolean };
-type Question = {
+export type Option = { letter: string; text: string; correct: boolean };
+export type Question = {
   number: number;
   stem: string;
   options: Option[];

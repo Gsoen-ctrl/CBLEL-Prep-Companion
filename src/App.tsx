@@ -4,6 +4,10 @@ import MockExam from "./MockExam";
 import Onboarding from "./Onboarding";
 import TourOverlay from "./TourOverlay";
 import Pomodoro from "./Pomodoro";
+import { BottomNav } from "./components/BottomNav";
+import { MoreSheet } from "./components/MoreSheet";
+import { SettingsPage } from "./components/SettingsPage";
+import { StudyFeed } from "./components/StudyFeed";
 
 // ── storage state helpers
 export function loadJSON<T>(key: string, fallback: T): T {
@@ -254,35 +258,25 @@ export default function App() {
 
   useEffect(() => {
     const handleTouchStart = (e: TouchEvent) => {
-      // The user requested: "when swiping to the right anywhere on the app, the drawer opens"
-      // So we will just record the start X position regardless of where the swipe started
       setTouchStartX(e.touches[0].clientX);
     };
 
     const handleTouchEnd = (e: TouchEvent) => {
       if (touchStartX === null) return;
-      const touchEndX = e.changedTouches[0].clientX;
-      const swipeDistance = touchEndX - touchStartX;
-
-      // Swipe right detected (threshold 50px)
-      if (swipeDistance > 50) {
-        setSidebarOpen(true);
-      }
-
       setTouchStartX(null);
-    };
-
-    window.addEventListener("touchstart", handleTouchStart);
-    window.addEventListener("touchend", handleTouchEnd);
-
-    return () => {
-      window.removeEventListener("touchstart", handleTouchStart);
-      window.removeEventListener("touchend", handleTouchEnd);
     };
   }, [touchStartX]);
 
+  const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
+
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "practice" | "checklist" | "milestones" | "subjects"
+    | "dashboard"
+    | "practice"
+    | "study"
+    | "checklist"
+    | "milestones"
+    | "subjects"
+    | "settings"
   >("dashboard");
   const [darkMode, setDarkMode] = useState(() => {
     try {
@@ -525,6 +519,7 @@ export default function App() {
 
   return (
     <div
+      className="app-container"
       style={{
         minHeight: "100vh",
         display: "flex",
@@ -534,279 +529,6 @@ export default function App() {
         transition: "background 0.2s, color 0.2s",
       }}
     >
-      {/* ── mobile drawer ── */}
-      <div
-        className={`overlay ${sidebarOpen ? "open" : ""}`}
-        onClick={() => setSidebarOpen(false)}
-      ></div>
-      <aside className={`mobile-drawer ${sidebarOpen ? "open" : ""}`}>
-        <div
-          style={{
-            padding: "20px",
-            borderBottom: "1px solid var(--cream-border)",
-          }}
-        >
-          <div
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: "calc(20px * var(--scale, 1))",
-              color: "var(--ink)",
-            }}
-          >
-            {userName}'s Boards
-          </div>
-          <div
-            style={{
-              fontSize: "calc(11px * var(--scale, 1))",
-              color: "var(--ink-faint)",
-              marginTop: 4,
-            }}
-          >
-            CBLEL {examDate.getFullYear()} Roadmap
-          </div>
-        </div>
-        <nav
-          style={{
-            padding: "12px 0",
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          {(
-            [
-              "dashboard",
-              "practice",
-              "checklist",
-              "milestones",
-              "subjects",
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => {
-                setActiveTab(tab);
-                setSidebarOpen(false);
-              }}
-              style={{
-                fontFamily: "var(--font-body)",
-                fontSize: "calc(14px * var(--scale, 1))",
-                padding: "12px 20px",
-                background:
-                  activeTab === tab ? "var(--cream-dark)" : "transparent",
-                border: "none",
-                textAlign: "left",
-                color: activeTab === tab ? "var(--ink)" : "var(--ink-muted)",
-                cursor: "pointer",
-                fontWeight: activeTab === tab ? 500 : 400,
-                textTransform: "capitalize",
-                borderLeft:
-                  activeTab === tab
-                    ? "3px solid var(--ink)"
-                    : "3px solid transparent",
-              }}
-            >
-              {tab}
-            </button>
-          ))}
-        </nav>
-        <div
-          className="mobile-settings"
-          style={{
-            marginTop: "auto",
-            borderTop: "1px solid var(--cream-border)",
-          }}
-        >
-          <button
-            onClick={() => setMobileSettingsOpen(!mobileSettingsOpen)}
-            style={{
-              fontFamily: "var(--font-body)",
-              fontSize: "calc(14px * var(--scale, 1))",
-              padding: "16px 20px",
-              background: mobileSettingsOpen
-                ? "var(--cream-dark)"
-                : "transparent",
-              border: "none",
-              textAlign: "left",
-              color: "var(--ink)",
-              cursor: "pointer",
-              fontWeight: mobileSettingsOpen ? 500 : 400,
-              width: "100%",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span
-                style={{
-                  fontSize: "calc(16px * var(--scale, 1))",
-                  color: "var(--ink-muted)",
-                }}
-              >
-                ⚙
-              </span>
-              Settings
-            </div>
-            <span
-              style={{
-                fontSize: "calc(12px * var(--scale, 1))",
-                color: "var(--ink-faint)",
-              }}
-            >
-              {mobileSettingsOpen ? "▼" : "▲"}
-            </span>
-          </button>
-          {mobileSettingsOpen && (
-            <div
-              style={{
-                background: "var(--cream)",
-                padding: "16px 20px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 16,
-              }}
-            >
-              {/* Theme Toggle */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: "calc(13px * var(--scale, 1))",
-                    fontWeight: 500,
-                    color: "var(--ink)",
-                  }}
-                >
-                  Dark Mode
-                </span>
-                <button
-                  onClick={() => setDarkMode(!darkMode)}
-                  style={{
-                    width: 40,
-                    height: 22,
-                    borderRadius: 12,
-                    background: darkMode
-                      ? "var(--accent)"
-                      : "var(--cream-dark)",
-                    border: "1px solid var(--cream-border)",
-                    position: "relative",
-                    cursor: "pointer",
-                    transition: "background 0.2s",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 16,
-                      height: 16,
-                      borderRadius: "50%",
-                      background: darkMode
-                        ? "var(--cream)"
-                        : "var(--ink-muted)",
-                      position: "absolute",
-                      top: 2,
-                      left: darkMode ? 20 : 2,
-                      transition: "left 0.2s",
-                    }}
-                  />
-                </button>
-              </div>
-
-              {/* Font Style */}
-              <div>
-                <div
-                  style={{
-                    fontSize: "calc(12px * var(--scale, 1))",
-                    color: "var(--ink-muted)",
-                    marginBottom: 6,
-                  }}
-                >
-                  Font Style
-                </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button
-                    onClick={() => setSimpleFont(false)}
-                    style={{
-                      flex: 1,
-                      padding: "6px",
-                      fontSize: "calc(12px * var(--scale, 1))",
-                      borderRadius: "var(--radius-sm)",
-                      border: "1px solid var(--cream-border)",
-                      background: !simpleFont
-                        ? "var(--accent-bg)"
-                        : "var(--cream-dark)",
-                      color: !simpleFont ? "var(--accent)" : "var(--ink-muted)",
-                      fontFamily: "'Instrument Serif', Georgia, serif",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Serif
-                  </button>
-                  <button
-                    onClick={() => setSimpleFont(true)}
-                    style={{
-                      flex: 1,
-                      padding: "6px",
-                      fontSize: "calc(12px * var(--scale, 1))",
-                      borderRadius: "var(--radius-sm)",
-                      border: "1px solid var(--cream-border)",
-                      background: simpleFont
-                        ? "var(--accent-bg)"
-                        : "var(--cream-dark)",
-                      color: simpleFont ? "var(--accent)" : "var(--ink-muted)",
-                      fontFamily: "'Fraunces', Georgia, serif",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Fraunces
-                  </button>
-                </div>
-              </div>
-
-              {/* Font Size */}
-              <div>
-                <div
-                  style={{
-                    fontSize: "calc(12px * var(--scale, 1))",
-                    color: "var(--ink-muted)",
-                    marginBottom: 6,
-                  }}
-                >
-                  Text Size
-                </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {(["S", "M", "L"] as const).map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setFontSize(s)}
-                      style={{
-                        flex: 1,
-                        padding: "6px",
-                        fontSize: `calc(${s === "S" ? 11 : s === "M" ? 13 : 15}px * var(--scale, 1))`,
-                        borderRadius: "var(--radius-sm)",
-                        border: "1px solid var(--cream-border)",
-                        background:
-                          fontSize === s
-                            ? "var(--accent-bg)"
-                            : "var(--cream-dark)",
-                        color:
-                          fontSize === s ? "var(--accent)" : "var(--ink-muted)",
-                        cursor: "pointer",
-                        fontFamily: "var(--font-body)",
-                      }}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </aside>
       {!tourSeen && (
         <TourOverlay
           onDismiss={() => {
@@ -828,12 +550,6 @@ export default function App() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center" }}>
-          <button
-            className="hamburger-btn"
-            onClick={() => setSidebarOpen(true)}
-          >
-            ☰
-          </button>
           <div>
             <div
               style={{
@@ -1147,6 +863,7 @@ export default function App() {
           [
             "dashboard",
             "practice",
+            "study",
             "checklist",
             "milestones",
             "subjects",
@@ -2221,9 +1938,35 @@ export default function App() {
             })}
           </div>
         )}
+
+        {/* settings */}
+        {activeTab === "settings" && (
+          <SettingsPage
+            darkMode={darkMode}
+            setDarkMode={setDarkMode}
+            simpleFont={simpleFont}
+            setSimpleFont={setSimpleFont}
+            fontSize={fontSize}
+            setFontSize={setFontSize}
+          />
+        )}
+
+        {/* study */}
+        {activeTab === "study" && <StudyFeed />}
       </main>
 
       <Pomodoro />
+      <BottomNav
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onMoreClick={() => setIsMoreSheetOpen(true)}
+      />
+      <MoreSheet
+        isOpen={isMoreSheetOpen}
+        onClose={() => setIsMoreSheetOpen(false)}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+      />
     </div>
   );
 }
