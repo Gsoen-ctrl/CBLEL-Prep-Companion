@@ -1,7 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import { generateQuestion, StudyQuestion } from "./StudyGenerator";
-import { BookOpen } from "lucide-react";
+import { BookOpen, X } from "lucide-react";
 import { loadJSON, saveJSON } from "../utils/storage";
+
+const COMPLIMENTS = [
+  "Nice!",
+  "Keep it up!",
+  "You're on fire!",
+  "Amazing!",
+  "Unstoppable!",
+];
 
 const Particles: React.FC<{ color: string; count: number }> = ({
   color,
@@ -57,13 +65,22 @@ interface StudyFeedProps {
   onAnswer: (correct: boolean) => void;
   studyStreak: number;
   enableStreak: boolean;
+  onClose: () => void;
 }
 
 export const StudyFeed: React.FC<StudyFeedProps> = ({
   onAnswer,
   studyStreak,
   enableStreak,
+  onClose,
 }) => {
+  const prevStreakRef = useRef(studyStreak);
+  const [dyingStreak, setDyingStreak] = useState<{
+    score: number;
+    color: string;
+    compliment: string | null;
+  } | null>(null);
+
   const [questions, setQuestions] = useState<StudyQuestion[]>(() => {
     const raw = loadJSON<StudyQuestion[]>("studyFeedQuestions", []);
     if (raw.length > 10) {
@@ -177,6 +194,30 @@ export const StudyFeed: React.FC<StudyFeedProps> = ({
     onAnswer(correct);
   };
 
+  const [compliment, setCompliment] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check if a >0 streak was just broken
+    if (studyStreak === 0 && prevStreakRef.current > 0) {
+      setDyingStreak({
+        score: prevStreakRef.current,
+        color: getStreakColor(prevStreakRef.current) || "var(--sienna)",
+        compliment,
+      });
+      // Clear it out after the animation finishes
+      setTimeout(() => setDyingStreak(null), 600);
+    }
+    prevStreakRef.current = studyStreak;
+
+    if (enableStreak && studyStreak > 0 && studyStreak % 10 === 0) {
+      setCompliment(
+        COMPLIMENTS[Math.floor(Math.random() * COMPLIMENTS.length)],
+      );
+    } else if (studyStreak === 0) {
+      setCompliment(null);
+    }
+  }, [studyStreak, enableStreak, compliment]);
+
   if (loading) {
     return (
       <div
@@ -193,51 +234,100 @@ export const StudyFeed: React.FC<StudyFeedProps> = ({
     );
   }
 
+  const streakColor = getStreakColor(studyStreak) || "var(--sienna)";
+  const blobDuration =
+    Math.max(2, 6 - Math.floor(studyStreak / 10) * 0.5) + "s";
+
+  const blobStyle = {
+    "--blob-color": streakColor,
+    animationDuration: blobDuration,
+  } as React.CSSProperties;
+
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        height: "100%",
-        width: "100%",
-        background: "var(--cream-dark)",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        className="study-feed-container"
-        ref={containerRef}
-        onScroll={handleScroll}
-        style={{
-          height: "100%",
-          width: "100%",
-          maxWidth: "450px",
-          background: "transparent",
-          overflowY: "scroll",
-          overflowX: "hidden",
-          scrollSnapType: "y mandatory",
-          scrollBehavior: "smooth",
-          position: "relative",
-          paddingTop: "10vh",
-          paddingBottom: "10vh",
-          display: "flex",
-          flexDirection: "column",
-          gap: "2vh",
-        }}
+    <div className="desktop-study-layout">
+      {/* Absolute Close Button for Desktop */}
+      <button
+        className="study-close-btn"
+        onClick={onClose}
+        title="Exit Study Mode"
       >
-        {questions.map((q, idx) => (
-          <StudyItem
-            key={`${idx}-${q.stem.slice(0, 10)}`}
-            question={q}
-            isActive={idx === activeIndex}
-            onAnswer={(letter, correct) =>
-              handleItemAnswer(idx, letter, correct)
-            }
-            studyStreak={studyStreak}
-            enableStreak={enableStreak}
-          />
-        ))}
+        <X size={24} />
+      </button>
+
+      {/* Left Column: Animated Streak Blob */}
+      <div className="study-side-col study-side-left">
+        {enableStreak && (studyStreak > 0 || dyingStreak) && (
+          <div
+            className={`streak-blob-container ${dyingStreak ? "fade-out-down" : "fade-in"}`}
+          >
+            <div
+              className="streak-blob"
+              style={
+                dyingStreak
+                  ? ({
+                      "--blob-color": dyingStreak.color,
+                      animationDuration: "8s",
+                    } as React.CSSProperties)
+                  : blobStyle
+              }
+            />
+            <div className="streak-blob-number">
+              {dyingStreak ? dyingStreak.score : studyStreak}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Center Column: Feed */}
+      <div className="study-center-col">
+        <div
+          className="study-feed-container"
+          ref={containerRef}
+          onScroll={handleScroll}
+          style={{
+            height: "100%",
+            width: "100%",
+            maxWidth: "450px",
+            background: "transparent",
+            overflowY: "scroll",
+            overflowX: "hidden",
+            scrollSnapType: "y mandatory",
+            scrollBehavior: "smooth",
+            position: "relative",
+            paddingTop: "10vh",
+            paddingBottom: "10vh",
+            display: "flex",
+            flexDirection: "column",
+            gap: "2vh",
+          }}
+        >
+          {questions.map((q, idx) => (
+            <StudyItem
+              key={`${idx}-${q.stem.slice(0, 10)}`}
+              question={q}
+              isActive={idx === activeIndex}
+              onAnswer={(letter, correct) =>
+                handleItemAnswer(idx, letter, correct)
+              }
+              studyStreak={studyStreak}
+              enableStreak={enableStreak}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Right Column: Compliment */}
+      <div className="study-side-col study-side-right">
+        {enableStreak &&
+          (compliment || (dyingStreak && dyingStreak.compliment)) && (
+            <div
+              key={dyingStreak ? "dying" : compliment} // Force re-render if dying
+              className={`study-compliment-text ${dyingStreak ? "fade-out-down" : "fade-in"}`}
+              style={{ color: dyingStreak ? dyingStreak.color : streakColor }}
+            >
+              {dyingStreak ? dyingStreak.compliment : compliment}
+            </div>
+          )}
       </div>
     </div>
   );

@@ -263,6 +263,19 @@ export default function App() {
     | "subjects"
     | "settings"
   >("dashboard");
+
+  const [previousTab, setPreviousTab] = useState<typeof activeTab>("dashboard");
+
+  function switchTab(newTab: typeof activeTab) {
+    if (activeTab !== "study" && newTab === "study") {
+      setPreviousTab(activeTab);
+    }
+    setActiveTab(newTab);
+  }
+
+  function handleCloseStudy() {
+    setActiveTab(previousTab);
+  }
   const [darkMode, setDarkMode] = useState(() => {
     try {
       return localStorage.getItem("darkMode") === "true";
@@ -941,7 +954,7 @@ export default function App() {
           ).map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => switchTab(tab)}
               style={{
                 fontFamily: "var(--font-body)",
                 fontSize: "calc(13px * var(--scale, 1))",
@@ -992,7 +1005,7 @@ export default function App() {
             milestones={milestones}
             cycleLength={cycleLength}
             studyDays={studyDays}
-            onNavigateToPractice={() => setActiveTab("practice")}
+            onNavigateToPractice={() => switchTab("practice")}
           />
         )}
         {activeTab === "practice" && <MockExam isRestDay={restDay} />}
@@ -2049,6 +2062,7 @@ export default function App() {
             onAnswer={handleStudyAnswer}
             studyStreak={studyStreak}
             enableStreak={enableStreak}
+            onClose={handleCloseStudy}
           />
         )}
       </main>
@@ -2058,7 +2072,7 @@ export default function App() {
       )}
       <BottomNav
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={switchTab}
         onMoreClick={() => setIsMoreSheetOpen(true)}
         studyStreak={studyStreak}
         enableStreak={enableStreak}
@@ -2067,7 +2081,7 @@ export default function App() {
         isOpen={isMoreSheetOpen}
         onClose={() => setIsMoreSheetOpen(false)}
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={switchTab}
       />
     </div>
   );

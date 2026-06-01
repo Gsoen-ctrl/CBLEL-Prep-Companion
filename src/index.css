@@ -571,6 +571,134 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   animation: fadeIn 0.3s ease-out;
 }
 
+@keyframes fadeDown {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(30px) scale(0.95);
+    opacity: 0;
+  }
+}
+
+.fade-out-down {
+  animation: fadeDown 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* ── DESKTOP STUDY LAYOUT ── */
+.desktop-study-layout {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+  background: var(--cream-dark);
+  overflow: hidden;
+  position: relative;
+}
+
+.study-side-col {
+  display: none; /* hidden on mobile */
+  flex: 1;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.study-center-col {
+  height: 100%;
+  width: 100%;
+  max-width: 450px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.study-close-btn {
+  display: none; /* hidden on mobile */
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  background: var(--cream);
+  border: 1px solid var(--cream-border);
+  color: var(--ink-faint);
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 100;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+.study-close-btn:hover {
+  color: var(--ink);
+  transform: scale(1.05);
+}
+
+@media (min-width: 769px) {
+  .study-side-col {
+    display: flex;
+  }
+  .study-close-btn {
+    display: flex;
+  }
+}
+
+/* ── STREAK BLOB ── */
+@keyframes blobMorph {
+  0% {
+    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+  }
+  50% {
+    border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
+  }
+  100% {
+    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+  }
+}
+
+.streak-blob-container {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.streak-blob {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: var(--blob-color, var(--sienna));
+  animation: blobMorph 8s ease-in-out infinite;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  transition: background 0.5s ease-in-out;
+}
+
+.streak-blob-number {
+  position: relative;
+  z-index: 1;
+  color: white;
+  font-family: var(--font-display);
+  font-size: calc(64px * var(--scale, 1));
+  font-weight: bold;
+}
+
+/* ── COMPLIMENT TEXT ── */
+.study-compliment-text {
+  font-family: var(--font-display);
+  font-size: calc(56px * var(--scale, 1));
+  font-weight: bold;
+  text-align: center;
+  line-height: 1.1;
+  transition: color 0.5s ease-in-out;
+}
+
 /* Hide scrollbar for Study Feed globally for Webkit/Firefox */
 .study-feed-container {
   /* hide scrollbar for Firefox */
