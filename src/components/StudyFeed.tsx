@@ -486,138 +486,139 @@ const StudyItem: React.FC<StudyItemProps> = ({
           flex: 1,
           display: "flex",
           flexDirection: "column",
-          justifyContent: "center",
           overflowY: "auto",
         }}
       >
-        {/* Topic Tag */}
-        <div
-          style={{
-            marginBottom: 16,
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            color: "var(--accent)",
-          }}
-        >
-          <BookOpen size={16} />
-          <span
-            style={{
-              fontSize: "calc(13px * var(--scale, 1))",
-              fontWeight: 500,
-            }}
-          >
-            {isClassification
-              ? isDDC
-                ? "DDC Practice"
-                : "LCC Practice"
-              : `Subject: ${question.subject}`}
-          </span>
-        </div>
-
-        {/* Question Stem */}
-        <div
-          style={{
-            fontSize: isClassification
-              ? "calc(24px * var(--scale, 1))"
-              : "calc(20px * var(--scale, 1))",
-            fontFamily: "var(--font-display)",
-            color: "var(--ink)",
-            textAlign: isClassification ? "center" : "left",
-            marginBottom: 32,
-            lineHeight: 1.3,
-          }}
-        >
-          {question.stem}
-        </div>
-
-        {/* Options */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {question.options.map((opt: any) => {
-            const isSelected = selectedLetter === opt.letter;
-            const isActualCorrect = opt.correct;
-
-            let bg = "var(--cream-dark)";
-            let border = "1px solid var(--cream-border)";
-            let color = "var(--ink)";
-
-            if (selectedLetter) {
-              if (isActualCorrect) {
-                bg = "var(--green-bg)";
-                border = "1px solid var(--green)";
-                color = "var(--green)";
-              } else if (isSelected && !isActualCorrect) {
-                bg = "var(--red-bg)";
-                border = "1px solid var(--red)";
-                color = "var(--red)";
-              } else {
-                color = "var(--ink-faint)";
-              }
-            }
-
-            return (
-              <button
-                key={opt.letter}
-                onClick={() => handleSelect(opt.letter)}
-                disabled={!!selectedLetter}
-                style={{
-                  padding: "16px",
-                  borderRadius: "var(--radius)",
-                  background: bg,
-                  border: border,
-                  color: color,
-                  fontSize: isClassification
-                    ? "calc(18px * var(--scale, 1))"
-                    : "calc(16px * var(--scale, 1))",
-                  textAlign: isClassification ? "center" : "left",
-                  cursor: selectedLetter ? "default" : "pointer",
-                  transition: "all 0.2s",
-                  fontFamily: "var(--font-body)",
-                }}
-              >
-                {!isClassification && (
-                  <span style={{ fontWeight: 500, marginRight: 8 }}>
-                    {opt.letter}.
-                  </span>
-                )}
-                {opt.text}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Explanation */}
-        {selectedLetter && !isCorrect && question.explanation && (
+        <div style={{ margin: "auto 0", width: "100%" }}>
+          {/* Topic Tag */}
           <div
             style={{
-              marginTop: 24,
-              padding: "16px",
-              background: "var(--accent-bg)",
-              borderRadius: "var(--radius)",
-              borderLeft: "3px solid var(--accent)",
-              animation: "fadeIn 0.3s ease-out",
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              color: "var(--accent)",
             }}
           >
-            <div
+            <BookOpen size={16} />
+            <span
               style={{
-                fontSize: "calc(12px * var(--scale, 1))",
-                color: "var(--ink-muted)",
-                marginBottom: 4,
+                fontSize: "calc(13px * var(--scale, 1))",
                 fontWeight: 500,
               }}
             >
-              Explanation
-            </div>
+              {isClassification
+                ? isDDC
+                  ? "DDC Practice"
+                  : "LCC Practice"
+                : `Subject: ${question.subject}`}
+            </span>
+          </div>
+
+          {/* Question Stem */}
+          <div
+            style={{
+              fontSize: isClassification
+                ? "calc(24px * var(--scale, 1))"
+                : "calc(20px * var(--scale, 1))",
+              fontFamily: "var(--font-display)",
+              color: "var(--ink)",
+              textAlign: isClassification ? "center" : "left",
+              marginBottom: 32,
+              lineHeight: 1.3,
+            }}
+          >
+            {question.stem}
+          </div>
+
+          {/* Options */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {question.options.map((opt: any) => {
+              const isSelected = selectedLetter === opt.letter;
+              const isActualCorrect = opt.correct;
+
+              let bg = "var(--cream-dark)";
+              let border = "1px solid var(--cream-border)";
+              let color = "var(--ink)";
+
+              if (selectedLetter) {
+                if (isActualCorrect) {
+                  bg = "var(--green-bg)";
+                  border = "1px solid var(--green)";
+                  color = "var(--green)";
+                } else if (isSelected && !isActualCorrect) {
+                  bg = "var(--red-bg)";
+                  border = "1px solid var(--red)";
+                  color = "var(--red)";
+                } else {
+                  color = "var(--ink-faint)";
+                }
+              }
+
+              return (
+                <button
+                  key={opt.letter}
+                  onClick={() => handleSelect(opt.letter)}
+                  disabled={!!selectedLetter}
+                  style={{
+                    padding: "16px",
+                    borderRadius: "var(--radius)",
+                    background: bg,
+                    border: border,
+                    color: color,
+                    fontSize: isClassification
+                      ? "calc(18px * var(--scale, 1))"
+                      : "calc(16px * var(--scale, 1))",
+                    textAlign: isClassification ? "center" : "left",
+                    cursor: selectedLetter ? "default" : "pointer",
+                    transition: "all 0.2s",
+                    fontFamily: "var(--font-body)",
+                  }}
+                >
+                  {!isClassification && (
+                    <span style={{ fontWeight: 500, marginRight: 8 }}>
+                      {opt.letter}.
+                    </span>
+                  )}
+                  {opt.text}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Explanation */}
+          {selectedLetter && !isCorrect && question.explanation && (
             <div
               style={{
-                fontSize: "calc(14px * var(--scale, 1))",
-                color: "var(--ink)",
+                marginTop: 24,
+                padding: "16px",
+                background: "var(--accent-bg)",
+                borderRadius: "var(--radius)",
+                borderLeft: "3px solid var(--accent)",
+                animation: "fadeIn 0.3s ease-out",
               }}
             >
-              {question.explanation}
+              <div
+                style={{
+                  fontSize: "calc(12px * var(--scale, 1))",
+                  color: "var(--ink-muted)",
+                  marginBottom: 4,
+                  fontWeight: 500,
+                }}
+              >
+                Explanation
+              </div>
+              <div
+                style={{
+                  fontSize: "calc(14px * var(--scale, 1))",
+                  color: "var(--ink)",
+                }}
+              >
+                {question.explanation}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Scroll Hint */}
