@@ -6,6 +6,15 @@
     "main"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    {
+      "identifier": "http:default",
+      "allow": [{ "url": "https://github.com/*" }, { "url": "https://objects.githubusercontent.com/*" }, { "url": "https://api.github.com/*" }]
+    },
+    "fs:default",
+    "shell:default",
+    "os:default",
+    "opener:default",
+    "opener:allow-open-url"
   ]
 }
