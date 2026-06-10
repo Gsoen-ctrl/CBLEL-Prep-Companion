@@ -737,7 +737,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .p2p-tab-animated.active {
-  background: var(--accent-bg) !important;
+  background: var(--accent) !important;
+  color: var(--cream) !important;
   box-shadow: none !important;
   animation: none;
 }
