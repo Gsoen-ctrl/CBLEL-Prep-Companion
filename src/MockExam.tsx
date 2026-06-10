@@ -1572,6 +1572,11 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
         <button
           key={t}
           onClick={() => setView(t)}
+          className={
+            t === "p2p-sessions"
+              ? `p2p-tab-animated ${view === t ? "active" : ""}`
+              : ""
+          }
           style={{
             fontFamily: "var(--font-body)",
             fontSize: "calc(13px * var(--scale, 1))",
@@ -2230,12 +2235,13 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
                   }}
                   style={{
                     padding: "10px 16px",
-                    background: "var(--ink)",
-                    color: "var(--cream)",
+                    background: "var(--accent)",
+                    color: "white",
                     border: "none",
-                    borderRadius: "12px",
+                    borderRadius: "var(--radius-sm)",
                     cursor: "pointer",
-                    fontSize: "calc(14px * var(--scale, 1))",
+                    fontSize: "calc(13px * var(--scale, 1))",
+                    fontFamily: "var(--font-body)",
                     fontWeight: 500,
                   }}
                 >
@@ -3344,12 +3350,13 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
                   }}
                   style={{
                     padding: "10px 16px",
-                    background: "var(--ink)",
-                    color: "var(--cream)",
+                    background: "var(--accent)",
+                    color: "white",
                     border: "none",
-                    borderRadius: "12px",
+                    borderRadius: "var(--radius-sm)",
                     cursor: "pointer",
-                    fontSize: "calc(14px * var(--scale, 1))",
+                    fontSize: "calc(13px * var(--scale, 1))",
+                    fontFamily: "var(--font-body)",
                     fontWeight: 500,
                   }}
                 >
