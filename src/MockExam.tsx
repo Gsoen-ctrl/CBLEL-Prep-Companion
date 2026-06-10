@@ -2,9 +2,12 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { loadSubjects } from "./App";
 import { quizCompletedKey } from "./Dashboard";
 import { loadJSON, updateRecentlySeenQuestions } from "./utils/storage";
+import { P2P_SESSIONS } from "./utils/p2pConstants";
+import { Users } from "lucide-react";
+import { getAnonymousUuid } from "./utils/storage";
 
 // ── types
-export type SessionType = "exam" | "quiz" | "custom" | "classification";
+export type SessionType = "exam" | "quiz" | "custom" | "classification" | "p2p";
 
 export type Option = { letter: string; text: string; correct: boolean };
 export type Question = {
@@ -60,7 +63,7 @@ function parseExamCode(raw: string): string {
   return match ? match[1].toUpperCase() : "";
 }
 
-function parseQuestions(raw: string): Question[] {
+function parseQuestions(raw: string, isP2p: boolean = false): Question[] {
   const lines = raw
     .split("\n")
     .map((l) => l.trim())
@@ -92,7 +95,12 @@ function parseQuestions(raw: string): Question[] {
 
       const stemText = qMatchOld ? qMatchOld[2] : qMatchNew ? qMatchNew[1] : "";
 
-      current = { number: questionCounter++, stem: stemText, options: [] };
+      let questionNumber = questionCounter++;
+      if (isP2p && qMatchOld) {
+        questionNumber = parseInt(qMatchOld[1], 10);
+      }
+
+      current = { number: questionNumber, stem: stemText, options: [] };
     } else if ((oMatchOld || oMatchNew) && current) {
       const isCorrect = oMatchOld
         ? oMatchOld[1] === "*"
@@ -148,29 +156,40 @@ function shuffleArray<T>(array: T[]): T[] {
 function processQuestionsSubset(
   allQuestions: Question[],
   count: number,
+  isP2p: boolean = false,
 ): Question[] {
   const recent = loadJSON<string[]>("recentlySeenQuestions", []);
 
-  // Shuffle everything completely randomly
-  let shuffled = shuffleArray(allQuestions);
-  shuffled.sort((a, b) => {
-    const aSeen = recent.includes(a.stem);
-    const bSeen = recent.includes(b.stem);
-    if (!aSeen && bSeen) return -1;
-    if (aSeen && !bSeen) return 1;
-    return 0;
-  });
+  let subset: Question[];
 
-  const subset = shuffled.slice(0, count);
+  if (isP2p) {
+    subset = allQuestions.slice(0, count);
+  } else {
+    // Shuffle everything completely randomly
+    let shuffled = shuffleArray(allQuestions);
+    shuffled.sort((a, b) => {
+      const aSeen = recent.includes(a.stem);
+      const bSeen = recent.includes(b.stem);
+      if (!aSeen && bSeen) return -1;
+      if (aSeen && !bSeen) return 1;
+      return 0;
+    });
+    subset = shuffled.slice(0, count);
+  }
+
   updateRecentlySeenQuestions(subset.map((q) => q.stem));
 
   return subset.map((q, idx) => {
-    // Shuffle options while re-assigning letters
-    const shuffledOptions = shuffleArray(q.options).map((opt, oIdx) => {
+    // Options are ALWAYS shuffled. For P2P we preserve the original question order, but not choices.
+    const processedOptions = shuffleArray(q.options);
+
+    const finalOptions = processedOptions.map((opt, oIdx) => {
       const letters = ["A", "B", "C", "D", "E", "F"];
       return { ...opt, letter: letters[oIdx] || "?" };
     });
-    return { ...q, number: idx + 1, options: shuffledOptions };
+
+    const number = isP2p ? q.number : idx + 1;
+    return { ...q, number, options: finalOptions };
   });
 }
 
@@ -246,8 +265,6 @@ function scoreLabel(pct: number): string {
         ? "Keep pushing"
         : "Review needed";
 }
-
-const EXAM_DURATION = 3600;
 
 // ── progress bar
 function ProgressBar({ current, total }: { current: number; total: number }) {
@@ -807,7 +824,7 @@ function PreviousExams({ filterType }: { filterType: "exam" | "quiz" }) {
 // ── main component
 export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
   const [view, setView] = useState<
-    "exam" | "history-exams" | "history-quizzes"
+    "exam" | "history-exams" | "history-quizzes" | "p2p-sessions"
   >("exam");
   const [phase, setPhase] = useState<ExamPhase>("load");
   const [sessionType, setSessionType] = useState<SessionType>("exam");
@@ -827,6 +844,11 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
   const [showUploadErrorModal, setShowUploadErrorModal] = useState<
     string | null
   >(null);
+  const [showP2pModal, setShowP2pModal] = useState<
+    (typeof P2P_SESSIONS)[0] | null
+  >(null);
+  const [p2pPassword, setP2pPassword] = useState("");
+  const [p2pError, setP2pError] = useState("");
   const [subjectSelector, setSubjectSelector] = useState<{
     show: boolean;
     count: number;
@@ -848,6 +870,8 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
   const [examStartTime, setExamStartTime] = useState<Date | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const examDuration = sessionType === "p2p" ? 7200 : 3600;
+
   // saved result (for save prompt)
   const [pendingExam, setPendingExam] = useState<SavedExam | null>(null);
   const [saved, setSaved] = useState(false);
@@ -867,10 +891,10 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
     setExamStartTime(new Date());
     timerRef.current = setInterval(() => {
       setElapsed((e) => {
-        if (e + 1 >= EXAM_DURATION) {
+        if (e + 1 >= examDuration) {
           clearInterval(timerRef.current!);
           // auto-finish via ref to avoid stale closure via a flag
-          return EXAM_DURATION;
+          return examDuration;
         }
         return e + 1;
       });
@@ -886,10 +910,10 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
 
   // watch elapsed to auto-finish when time runs out
   useEffect(() => {
-    if (elapsed >= EXAM_DURATION && phase === "exam") {
+    if (elapsed >= examDuration && phase === "exam") {
       finishExam(elapsed);
     }
-  }, [elapsed, phase]);
+  }, [elapsed, phase, examDuration]);
 
   // ── file loading
   function proceedAction(action: () => void) {
@@ -945,6 +969,40 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
     const file = e.dataTransfer.files[0];
     if (file) handleFile(file);
   }, []);
+
+  async function startP2pExam(session: (typeof P2P_SESSIONS)[0]) {
+    try {
+      setParseError("");
+      const res = await fetch(`P2PQS/${session.code}.txt`);
+      if (!res.ok) {
+        setP2pError("Could not load question bank.");
+        return;
+      }
+      const text = await res.text();
+      let code = session.code;
+
+      const parsedAll = parseQuestions(text, true);
+      if (parsedAll.length === 0) {
+        setP2pError("No valid P2P questions found.");
+        return;
+      }
+
+      // For P2P we take the first 100 questions or all if less than 100
+      const count = Math.min(parsedAll.length, 100);
+      const subset = processQuestionsSubset(parsedAll, count, true);
+
+      setQuestions(subset);
+      setExamCode(code);
+      setFileName(`P2P_${session.code}.txt`);
+      setSessionType("p2p");
+      setMode("end");
+      setPhase("configure");
+      setShowP2pModal(null);
+      setP2pPassword("");
+    } catch (err) {
+      setP2pError("Error starting P2P exam.");
+    }
+  }
 
   async function fetchBuiltIn(
     subjectShort: string,
@@ -1013,57 +1071,80 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
 
   function finishExam(timeTaken: number) {
     stopTimer();
-    // compute results using current answers state
-    setAnswers((currentAnswers) => {
-      const correct = questions.filter((q, i) => {
+    // compute results using current answers state directly
+    const currentAnswers = answers;
+    const correct = questions.filter((q, i) => {
+      const chosen = currentAnswers[i];
+      return chosen && q.options.find((o) => o.letter === chosen)?.correct;
+    }).length;
+    const score = Math.round((correct / questions.length) * 100);
+
+    // Log differently based on session type
+    if (sessionType === "exam" || sessionType === "custom") {
+      saveJSON(scoreKey(new Date()), score);
+    } else if (sessionType !== "p2p") {
+      saveJSON(quizCompletedKey(new Date()), true);
+    }
+
+    const wrong: WrongItem[] = questions
+      .map((q, i) => {
         const chosen = currentAnswers[i];
-        return chosen && q.options.find((o) => o.letter === chosen)?.correct;
-      }).length;
-      const score = Math.round((correct / questions.length) * 100);
+        const chosenOpt = q.options.find((o) => o.letter === chosen);
+        const correctOpt = q.options.find((o) => o.correct);
+        const isWrong =
+          !chosen || !q.options.find((o) => o.letter === chosen)?.correct;
+        if (!isWrong) return null;
+        return {
+          number: q.number,
+          stem: q.stem,
+          chosen,
+          chosenText: chosenOpt?.text,
+          correctLetter: correctOpt?.letter || "",
+          correctText: correctOpt?.text || "",
+          explanation: q.explanation,
+        };
+      })
+      .filter(Boolean) as WrongItem[];
 
-      // Log differently based on session type
-      if (sessionType === "exam" || sessionType === "custom") {
-        saveJSON(scoreKey(new Date()), score);
-      } else {
-        saveJSON(quizCompletedKey(new Date()), true);
-      }
+    const examRecord: SavedExam = {
+      id: `${examCode || "EXAM"}-${Date.now()}`,
+      examCode: examCode || fileName.replace(".txt", ""),
+      date: new Date().toISOString(),
+      score,
+      correct,
+      total: questions.length,
+      timeTaken,
+      mode,
+      wrong,
+      sessionType,
+    };
 
-      const wrong: WrongItem[] = questions
-        .map((q, i) => {
-          const chosen = currentAnswers[i];
-          const chosenOpt = q.options.find((o) => o.letter === chosen);
-          const correctOpt = q.options.find((o) => o.correct);
-          const isWrong =
-            !chosen || !q.options.find((o) => o.letter === chosen)?.correct;
-          if (!isWrong) return null;
-          return {
-            number: q.number,
-            stem: q.stem,
-            chosen,
-            chosenText: chosenOpt?.text,
-            correctLetter: correctOpt?.letter || "",
-            correctText: correctOpt?.text || "",
-            explanation: q.explanation,
-          };
-        })
-        .filter(Boolean) as WrongItem[];
-
-      const examRecord: SavedExam = {
-        id: `${examCode || "EXAM"}-${Date.now()}`,
-        examCode: examCode || fileName.replace(".txt", ""),
-        date: new Date().toISOString(),
+    if (sessionType === "p2p") {
+      const uuid = getAnonymousUuid();
+      const payload = {
+        uuid,
+        sessionCode: examRecord.examCode,
         score,
         correct,
         total: questions.length,
+        wrongItems: wrong.map((w) => w.number), // array of wrong question numbers
         timeTaken,
-        mode,
-        wrong,
-        sessionType,
       };
-      setPendingExam(examRecord);
-      setPhase("review");
-      return currentAnswers;
-    });
+      const webhookUrl = import.meta.env.VITE_WEBHOOK_URL;
+      if (webhookUrl) {
+        fetch(webhookUrl, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }).catch(() => {});
+      }
+
+      appendSavedExam(examRecord); // Auto save for their personal dashboard
+    }
+
+    setPendingExam(examRecord);
+    setPhase("review");
   }
 
   function saveExam() {
@@ -1461,7 +1542,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
   const chosenLetter = answers[current];
   const isRevealed =
     mode === "immediate" ? !!revealed[current] : phase === "review";
-  const timedOut = elapsed >= EXAM_DURATION;
+  const timedOut = elapsed >= examDuration;
 
   // LLE TOS weighting logic
   const allSubjects = loadSubjects();
@@ -1481,9 +1562,13 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
         display: "flex",
         borderBottom: "1px solid var(--cream-border)",
         padding: "0 24px",
+        overflowX: "auto",
+        flexShrink: 0,
       }}
     >
-      {(["exam", "history-exams", "history-quizzes"] as const).map((t) => (
+      {(
+        ["exam", "history-exams", "history-quizzes", "p2p-sessions"] as const
+      ).map((t) => (
         <button
           key={t}
           onClick={() => setView(t)}
@@ -1499,13 +1584,16 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
             cursor: "pointer",
             fontWeight: view === t ? 500 : 400,
             textTransform: "capitalize",
+            whiteSpace: "nowrap",
           }}
         >
           {t === "history-exams"
             ? "Previous Exams"
             : t === "history-quizzes"
               ? "Previous Quizzes"
-              : "Exam"}
+              : t === "p2p-sessions"
+                ? "P2P Sessions"
+                : "Exam"}
         </button>
       ))}
     </div>
@@ -1585,25 +1673,587 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
     </div>
   );
 
+  // ── render wrapper
+  const renderWithTabBar = (
+    content: React.ReactNode,
+    showTabBar: boolean = true,
+  ) => (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {showTabBar && tabBar}
+      {content}
+    </div>
+  );
+
   // ── render: history
   if (view === "history-exams" || view === "history-quizzes")
-    return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-        {tabBar}
-        <div style={{ flex: 1, overflowY: "auto" }}>
-          <PreviousExams
-            filterType={view === "history-exams" ? "exam" : "quiz"}
-          />
-        </div>
-      </div>
+    return renderWithTabBar(
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        <PreviousExams
+          filterType={view === "history-exams" ? "exam" : "quiz"}
+        />
+      </div>,
     );
 
+  if (view === "p2p-sessions" && !(sessionType === "p2p" && phase !== "load")) {
+    const p2pExams = loadSavedExams().filter((e) => e.sessionType === "p2p");
+
+    // Group by subject and calculate GWA based on POST exams
+    const allSubjects = loadSubjects();
+    let totalPostScore = 0;
+    let postCount = 0;
+    const p2pWeaknesses: {
+      short: string;
+      name: string;
+      preScore: number | null;
+      postScore: number | null;
+    }[] = allSubjects.map((subj) => ({
+      short: subj.short,
+      name: subj.name,
+      preScore: null,
+      postScore: null,
+    }));
+
+    p2pExams.forEach((exam) => {
+      const parts = exam.examCode.split("_");
+      if (parts.length >= 2) {
+        const short = parts[0]; // e.g. LOM
+        const type = parts[1]; // PRE or POST
+
+        const target = p2pWeaknesses.find((w) => w.short === short);
+        if (target) {
+          if (type === "PRE") {
+            // Using most recent, assuming exams array is sorted newest first (which appendSavedExam does)
+            if (target.preScore === null) target.preScore = exam.score;
+          }
+          if (type === "POST") {
+            if (target.postScore === null) target.postScore = exam.score;
+          }
+        }
+      }
+    });
+
+    p2pWeaknesses.forEach((w) => {
+      if (w.postScore !== null) {
+        totalPostScore += w.postScore;
+        postCount++;
+      }
+    });
+
+    const gwa = postCount > 0 ? Math.round(totalPostScore / postCount) : null;
+    const focusSubjects = p2pWeaknesses.filter(
+      (w) =>
+        w.postScore !== null && w.preScore !== null && w.postScore < w.preScore,
+    );
+
+    return renderWithTabBar(
+      <>
+        <div
+          style={{
+            padding: "24px",
+            maxWidth: 560,
+            margin: "0 auto",
+            width: "100%",
+            flex: 1,
+            overflowY: "auto",
+          }}
+        >
+          <div style={{ marginBottom: 24 }}>
+            <div
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: "calc(20px * var(--scale, 1))",
+                color: "var(--ink)",
+                marginBottom: 4,
+              }}
+            >
+              Practice
+            </div>
+            <div
+              style={{
+                fontSize: "calc(13px * var(--scale, 1))",
+                color: "var(--ink-muted)",
+              }}
+            >
+              Select a subject to begin.
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              setView("exam");
+              setSubjectSelector({ show: false, count: 0 });
+              setShowClassifications(false);
+              setClassificationType(null);
+              setShowCustom(false);
+              setParseError("");
+            }}
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--ink-muted)",
+              fontSize: "calc(13px * var(--scale, 1))",
+              cursor: "pointer",
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            ← Back to modes
+          </button>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "8px",
+              marginBottom: "16px",
+            }}
+          >
+            {P2P_SESSIONS.map((sess) => {
+              const isCompleted = p2pExams.some(
+                (e) => e.examCode === sess.code,
+              );
+              return (
+                <button
+                  key={sess.id}
+                  onClick={() => {
+                    if (isCompleted) return;
+                    setShowP2pModal(sess);
+                    setP2pPassword("");
+                    setP2pError("");
+                  }}
+                  style={{
+                    background: isCompleted
+                      ? "var(--cream-dark)"
+                      : "var(--cream)",
+                    border: "1px solid var(--cream-border)",
+                    borderRadius: "12px",
+                    padding: "16px",
+                    textAlign: "left",
+                    cursor: isCompleted ? "not-allowed" : "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "4px",
+                    opacity: isCompleted ? 0.6 : 1,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "calc(15px * var(--scale, 1))",
+                      fontWeight: 500,
+                      color: "var(--ink)",
+                      textDecoration: isCompleted ? "line-through" : "none",
+                    }}
+                  >
+                    {sess.subject}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "calc(12px * var(--scale, 1))",
+                      color: "var(--ink-muted)",
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {sess.name} {isCompleted ? "(Completed)" : ""}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* P2P Statistics */}
+          <div
+            style={{
+              background: "var(--cream)",
+              border: "1px solid var(--cream-border)",
+              borderRadius: "var(--radius)",
+              padding: "16px",
+              marginTop: "24px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "calc(15px * var(--scale, 1))",
+                fontWeight: 500,
+                color: "var(--ink)",
+                marginBottom: "12px",
+              }}
+            >
+              P2P Session Statistics
+            </div>
+
+            {p2pExams.length === 0 ? (
+              <div
+                style={{
+                  fontSize: "calc(13px * var(--scale, 1))",
+                  color: "var(--ink-muted)",
+                  textAlign: "center",
+                  padding: "16px 0",
+                }}
+              >
+                Complete P2P Sessions to see your statistics here.
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "16px",
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "baseline",
+                      marginBottom: 6,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "calc(12px * var(--scale, 1))",
+                        fontWeight: 500,
+                        color: "var(--ink)",
+                      }}
+                    >
+                      Post-Exam GWA
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "calc(16px * var(--scale, 1))",
+                        fontFamily: "var(--font-display)",
+                        color:
+                          gwa !== null && gwa >= 75
+                            ? "var(--green)"
+                            : "var(--accent)",
+                      }}
+                    >
+                      {gwa !== null ? `${gwa}%` : "—"}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      height: 8,
+                      background: "var(--cream-dark)",
+                      borderRadius: 4,
+                      position: "relative",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: "75%",
+                        top: 0,
+                        bottom: 0,
+                        width: 1,
+                        background: "var(--accent)",
+                        opacity: 0.5,
+                        zIndex: 2,
+                      }}
+                    />
+                    {gwa !== null && (
+                      <div
+                        style={{
+                          height: "100%",
+                          width: `${gwa}%`,
+                          background:
+                            gwa < 75 ? "var(--accent)" : "var(--green)",
+                          borderRadius: 4,
+                          transition: "width 0.5s ease",
+                          zIndex: 1,
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    background:
+                      focusSubjects.length > 0
+                        ? "var(--red-bg)"
+                        : "var(--green-bg)",
+                    padding: 12,
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "calc(11px * var(--scale, 1))",
+                      color:
+                        focusSubjects.length > 0
+                          ? "var(--red)"
+                          : "var(--green)",
+                      fontWeight: 500,
+                      marginBottom: 6,
+                    }}
+                  >
+                    Focus Area
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "calc(12px * var(--scale, 1))",
+                      color: "var(--ink)",
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {focusSubjects.length > 0
+                      ? `Your post-exam score is lower than your pre-exam score in: ${focusSubjects.map((s) => s.short).join(", ")}. Consider dedicating more time to these subjects.`
+                      : p2pWeaknesses.some(
+                            (w) => w.preScore !== null && w.postScore !== null,
+                          )
+                        ? "Great job! Your post-exam scores show improvement or consistency across all subjects."
+                        : "Complete both Pre and Post exams for a subject to see improvement tracking."}
+                  </div>
+                </div>
+
+                {/* Score comparisons */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "calc(12px * var(--scale, 1))",
+                      fontWeight: 500,
+                      color: "var(--ink-muted)",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    Subject Breakdown
+                  </div>
+                  {p2pWeaknesses.map((w) => {
+                    const hasPre = w.preScore !== null;
+                    const hasPost = w.postScore !== null;
+                    if (!hasPre && !hasPost) return null;
+
+                    return (
+                      <div
+                        key={w.short}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "8px 12px",
+                          background: "var(--cream-dark)",
+                          borderRadius: "var(--radius-sm)",
+                          border: "1px solid var(--cream-border)",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "calc(13px * var(--scale, 1))",
+                            fontWeight: 500,
+                            color: "var(--ink)",
+                          }}
+                        >
+                          {w.short}
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "16px",
+                            fontSize: "calc(12px * var(--scale, 1))",
+                          }}
+                        >
+                          <div>
+                            <span style={{ color: "var(--ink-faint)" }}>
+                              Pre:{" "}
+                            </span>
+                            <span
+                              style={{ color: "var(--ink)", fontWeight: 500 }}
+                            >
+                              {hasPre ? `${w.preScore}%` : "—"}
+                            </span>
+                          </div>
+                          <div>
+                            {hasPost ? (
+                              <>
+                                <span style={{ color: "var(--ink-faint)" }}>
+                                  Post:{" "}
+                                </span>
+                                <span
+                                  style={{
+                                    color: "var(--ink)",
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  {w.postScore}%
+                                </span>
+                              </>
+                            ) : (
+                              <span
+                                style={{
+                                  fontSize: "calc(10px * var(--scale, 1))",
+                                  padding: "2px 6px",
+                                  borderRadius: "4px",
+                                  background: "var(--accent-bg)",
+                                  color: "var(--accent)",
+                                  fontWeight: 500,
+                                }}
+                              >
+                                Waiting for Post-Exam
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {showP2pModal && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.4)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 9999,
+              padding:
+                "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)",
+            }}
+          >
+            <div
+              style={{
+                background: "var(--cream)",
+                padding: "24px",
+                borderRadius: "20px",
+                maxWidth: "320px",
+                width: "90%",
+                border: "1px solid var(--cream-border)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "16px",
+              }}
+            >
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: "calc(16px * var(--scale, 1))",
+                  fontWeight: 600,
+                  color: "var(--ink)",
+                }}
+              >
+                {showP2pModal.name}
+              </h3>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "calc(14px * var(--scale, 1))",
+                  color: "var(--ink-muted)",
+                }}
+              >
+                This session requires a password.
+              </p>
+              <input
+                type="text"
+                placeholder="Password"
+                value={p2pPassword}
+                onChange={(e) => {
+                  setP2pPassword(e.target.value);
+                  setP2pError("");
+                }}
+                style={{
+                  padding: "12px",
+                  borderRadius: "12px",
+                  border: "1px solid var(--cream-border)",
+                  fontSize: "calc(16px * var(--scale, 1))",
+                  width: "100%",
+                  boxSizing: "border-box",
+                  background: "var(--cream-dark)",
+                  color: "var(--ink)",
+                }}
+              />
+              {p2pError && (
+                <div
+                  style={{
+                    color: "#8B3A3A",
+                    fontSize: "calc(12px * var(--scale, 1))",
+                    background: "#F5E8E8",
+                    padding: "8px 12px",
+                    borderRadius: "8px",
+                  }}
+                >
+                  {p2pError}
+                </div>
+              )}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "8px",
+                  marginTop: "8px",
+                }}
+              >
+                <button
+                  onClick={() => {
+                    setShowP2pModal(null);
+                    setP2pPassword("");
+                    setP2pError("");
+                  }}
+                  style={{
+                    padding: "10px 16px",
+                    background: "transparent",
+                    color: "var(--ink-muted)",
+                    border: "none",
+                    borderRadius: "12px",
+                    cursor: "pointer",
+                    fontSize: "calc(14px * var(--scale, 1))",
+                    fontWeight: 500,
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (p2pPassword === showP2pModal.password) {
+                      startP2pExam(showP2pModal);
+                    } else {
+                      setP2pError("Incorrect password.");
+                    }
+                  }}
+                  style={{
+                    padding: "10px 16px",
+                    background: "var(--ink)",
+                    color: "var(--cream)",
+                    border: "none",
+                    borderRadius: "12px",
+                    cursor: "pointer",
+                    fontSize: "calc(14px * var(--scale, 1))",
+                    fontWeight: 500,
+                  }}
+                >
+                  Unlock
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>,
+    );
+  }
+
   // ── render: load
-  if (phase === "load")
-    return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+  if (phase === "load" && view === "exam")
+    return renderWithTabBar(
+      <>
         {uploadErrorModal}
-        {tabBar}
         <div
           style={{
             padding: "24px",
@@ -1726,7 +2376,10 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
             <div>
               <button
                 onClick={() => {
-                  if (classificationType) {
+                  if (classificationType === "MARC") {
+                    setClassificationType(null);
+                    setShowClassifications(false);
+                  } else if (classificationType) {
                     setClassificationType(null);
                   } else {
                     setShowClassifications(false);
@@ -1746,7 +2399,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
                 }}
               >
                 ←{" "}
-                {classificationType
+                {classificationType && classificationType !== "MARC"
                   ? "Back to Classifications"
                   : "Back to modes"}
               </button>
@@ -2586,6 +3239,127 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
           )}
         </div>
 
+        {/* P2P Password Modal */}
+        {showP2pModal && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.4)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 9999,
+              padding:
+                "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)",
+            }}
+          >
+            <div
+              style={{
+                background: "var(--cream)",
+                padding: "24px",
+                borderRadius: "20px",
+                maxWidth: "320px",
+                width: "90%",
+                border: "1px solid var(--cream-border)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "16px",
+              }}
+            >
+              <h3
+                style={{ margin: 0, fontSize: "calc(18px * var(--scale, 1))" }}
+              >
+                {showP2pModal.name}
+              </h3>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "calc(14px * var(--scale, 1))",
+                  color: "var(--ink-muted)",
+                }}
+              >
+                This session requires a password.
+              </p>
+              <input
+                type="text"
+                placeholder="Password"
+                value={p2pPassword}
+                onChange={(e) => {
+                  setP2pPassword(e.target.value);
+                  setP2pError("");
+                }}
+                style={{
+                  padding: "12px",
+                  borderRadius: "12px",
+                  border: "1px solid var(--cream-border)",
+                  fontSize: "calc(16px * var(--scale, 1))",
+                  width: "100%",
+                  boxSizing: "border-box",
+                  background: "var(--cream-dark)",
+                  color: "var(--ink)",
+                }}
+              />
+              {p2pError && (
+                <div
+                  style={{
+                    color: "var(--red)",
+                    fontSize: "calc(12px * var(--scale, 1))",
+                  }}
+                >
+                  {p2pError}
+                </div>
+              )}
+              <div
+                style={{
+                  display: "flex",
+                  gap: "12px",
+                  justifyContent: "flex-end",
+                  marginTop: "8px",
+                }}
+              >
+                <button
+                  onClick={() => setShowP2pModal(null)}
+                  style={{
+                    padding: "10px 16px",
+                    background: "transparent",
+                    border: "none",
+                    color: "var(--ink-faint)",
+                    cursor: "pointer",
+                    fontSize: "calc(14px * var(--scale, 1))",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (p2pPassword === showP2pModal.password) {
+                      startP2pExam(showP2pModal);
+                    } else {
+                      setP2pError("Incorrect password.");
+                    }
+                  }}
+                  style={{
+                    padding: "10px 16px",
+                    background: "var(--ink)",
+                    color: "var(--cream)",
+                    border: "none",
+                    borderRadius: "12px",
+                    cursor: "pointer",
+                    fontSize: "calc(14px * var(--scale, 1))",
+                    fontWeight: 500,
+                  }}
+                >
+                  Unlock
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Rest Day Modal */}
         {restModalAction && (
           <>
@@ -2671,14 +3445,97 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
             </div>
           </>
         )}
-      </div>
+      </>,
     );
+
+  // tab guard: active p2p session but looking at exam tab
+  if (view === "exam" && sessionType === "p2p" && phase !== "load") {
+    return renderWithTabBar(
+      <div style={{ padding: "40px 24px", textAlign: "center" }}>
+        <div
+          style={{
+            fontSize: "calc(16px * var(--scale, 1))",
+            fontWeight: 500,
+            color: "var(--ink)",
+            marginBottom: 8,
+          }}
+        >
+          Active P2P Session
+        </div>
+        <div
+          style={{
+            fontSize: "calc(13px * var(--scale, 1))",
+            color: "var(--ink-muted)",
+            marginBottom: 20,
+          }}
+        >
+          You currently have an active P2P session running.
+        </div>
+        <button
+          onClick={() => setView("p2p-sessions")}
+          style={{
+            padding: "10px 20px",
+            background: "var(--accent)",
+            color: "white",
+            border: "none",
+            borderRadius: "var(--radius-sm)",
+            cursor: "pointer",
+            fontWeight: 500,
+            fontSize: "calc(13px * var(--scale, 1))",
+          }}
+        >
+          Return to P2P Session
+        </button>
+      </div>,
+    );
+  }
+
+  // tab guard: active standard exam but looking at p2p tab
+  if (view === "p2p-sessions" && sessionType !== "p2p" && phase !== "load") {
+    return renderWithTabBar(
+      <div style={{ padding: "40px 24px", textAlign: "center" }}>
+        <div
+          style={{
+            fontSize: "calc(16px * var(--scale, 1))",
+            fontWeight: 500,
+            color: "var(--ink)",
+            marginBottom: 8,
+          }}
+        >
+          Active Exam Session
+        </div>
+        <div
+          style={{
+            fontSize: "calc(13px * var(--scale, 1))",
+            color: "var(--ink-muted)",
+            marginBottom: 20,
+          }}
+        >
+          You currently have an active practice session running.
+        </div>
+        <button
+          onClick={() => setView("exam")}
+          style={{
+            padding: "10px 20px",
+            background: "var(--accent)",
+            color: "white",
+            border: "none",
+            borderRadius: "var(--radius-sm)",
+            cursor: "pointer",
+            fontWeight: 500,
+            fontSize: "calc(13px * var(--scale, 1))",
+          }}
+        >
+          Return to Exam
+        </button>
+      </div>,
+    );
+  }
 
   // ── render: configure
   if (phase === "configure")
-    return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-        {tabBar}
+    return renderWithTabBar(
+      <>
         <div
           style={{
             padding: "24px",
@@ -2714,113 +3571,156 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
             </div>
           </div>
 
-          <div style={{ marginBottom: 20 }}>
+          {sessionType === "p2p" ? (
             <div
               style={{
-                fontSize: "calc(12px * var(--scale, 1))",
-                fontWeight: 500,
-                color: "var(--ink)",
-                marginBottom: 10,
+                padding: "16px",
+                background: "var(--red-bg)",
+                border: "1px solid var(--red)",
+                borderRadius: "var(--radius-sm)",
+                marginBottom: 20,
               }}
             >
-              Feedback mode
+              <div
+                style={{
+                  fontSize: "calc(13px * var(--scale, 1))",
+                  fontWeight: 600,
+                  color: "var(--red)",
+                  marginBottom: 8,
+                }}
+              >
+                P2P Session Reminder
+              </div>
+              <div
+                style={{
+                  fontSize: "calc(12px * var(--scale, 1))",
+                  color: "var(--ink)",
+                  lineHeight: 1.5,
+                }}
+              >
+                These sessions strictly enforce a{" "}
+                <strong>2-hour time limit</strong>. If you are starting a Post
+                exam, make sure you have already completed its respective Pre
+                exam to properly track your GWA. If this is a Pre exam, please
+                remember to take the corresponding Post exam afterwards before
+                moving on to another subject.
+              </div>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {(
-                [
-                  {
-                    value: "end",
-                    label: "Full exam mode",
-                    note: "Answer all questions, see results at the end",
-                  },
-                  {
-                    value: "immediate",
-                    label: "Immediate feedback",
-                    note: "See correct/wrong right after each answer",
-                  },
-                ] as const
-              ).map((opt) => (
-                <div
-                  key={opt.value}
-                  onClick={() => setMode(opt.value)}
-                  style={{
-                    padding: "12px 14px",
-                    borderRadius: "var(--radius-sm)",
-                    cursor: "pointer",
-                    border: `1px solid ${mode === opt.value ? "var(--accent-light)" : "var(--cream-border)"}`,
-                    background:
-                      mode === opt.value ? "var(--accent-bg)" : "var(--cream)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                  }}
-                >
+          ) : (
+            <div style={{ marginBottom: 20 }}>
+              <div
+                style={{
+                  fontSize: "calc(12px * var(--scale, 1))",
+                  fontWeight: 500,
+                  color: "var(--ink)",
+                  marginBottom: 10,
+                }}
+              >
+                Feedback mode
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {(
+                  [
+                    {
+                      value: "end",
+                      label: "Full exam mode",
+                      note: "Answer all questions, see results at the end",
+                    },
+                    {
+                      value: "immediate",
+                      label: "Immediate feedback",
+                      note: "See correct/wrong right after each answer",
+                    },
+                  ] as const
+                ).map((opt) => (
                   <div
+                    key={opt.value}
+                    onClick={() => setMode(opt.value)}
                     style={{
-                      width: 16,
-                      height: 16,
-                      borderRadius: "50%",
-                      flexShrink: 0,
-                      border: `2px solid ${mode === opt.value ? "var(--accent)" : "var(--cream-border)"}`,
+                      padding: "12px 14px",
+                      borderRadius: "var(--radius-sm)",
+                      cursor: "pointer",
+                      border: `1px solid ${mode === opt.value ? "var(--accent-light)" : "var(--cream-border)"}`,
                       background:
-                        mode === opt.value ? "var(--accent)" : "transparent",
+                        mode === opt.value
+                          ? "var(--accent-bg)"
+                          : "var(--cream)",
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "center",
+                      gap: 12,
                     }}
                   >
-                    {mode === opt.value && (
+                    <div
+                      style={{
+                        width: 16,
+                        height: 16,
+                        borderRadius: "50%",
+                        flexShrink: 0,
+                        border: `2px solid ${mode === opt.value ? "var(--accent)" : "var(--cream-border)"}`,
+                        background:
+                          mode === opt.value ? "var(--accent)" : "transparent",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {mode === opt.value && (
+                        <div
+                          style={{
+                            width: 5,
+                            height: 5,
+                            borderRadius: "50%",
+                            background: "white",
+                          }}
+                        />
+                      )}
+                    </div>
+                    <div>
                       <div
                         style={{
-                          width: 5,
-                          height: 5,
-                          borderRadius: "50%",
-                          background: "white",
+                          fontSize: "calc(13px * var(--scale, 1))",
+                          fontWeight: 500,
+                          color: "var(--ink)",
                         }}
-                      />
-                    )}
-                  </div>
-                  <div>
-                    <div
-                      style={{
-                        fontSize: "calc(13px * var(--scale, 1))",
-                        fontWeight: 500,
-                        color: "var(--ink)",
-                      }}
-                    >
-                      {opt.label}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "calc(11px * var(--scale, 1))",
-                        color: "var(--ink-faint)",
-                      }}
-                    >
-                      {opt.note}
+                      >
+                        {opt.label}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "calc(11px * var(--scale, 1))",
+                          color: "var(--ink-faint)",
+                        }}
+                      >
+                        {opt.note}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          <div
-            style={{
-              padding: "10px 14px",
-              background: "var(--cream-dark)",
-              border: "1px solid var(--cream-border)",
-              borderRadius: "var(--radius-sm)",
-              marginBottom: 20,
-              fontSize: "calc(12px * var(--scale, 1))",
-              color: "var(--ink-muted)",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <span style={{ fontSize: "calc(16px * var(--scale, 1))" }}>⏱</span>
-            Strict 1-hour timer. Exam auto-submits when time runs out.
-          </div>
+          {sessionType !== "p2p" && (
+            <div
+              style={{
+                padding: "10px 14px",
+                background: "var(--cream-dark)",
+                border: "1px solid var(--cream-border)",
+                borderRadius: "var(--radius-sm)",
+                marginBottom: 20,
+                fontSize: "calc(12px * var(--scale, 1))",
+                color: "var(--ink-muted)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <span style={{ fontSize: "calc(16px * var(--scale, 1))" }}>
+                ⏱
+              </span>
+              Strict 1-hour timer. Exam auto-submits when time runs out.
+            </div>
+          )}
 
           <div style={{ display: "flex", gap: 8 }}>
             <button
@@ -2857,13 +3757,13 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
             </button>
           </div>
         </div>
-      </div>
+      </>,
     );
 
   // ── render: exam
   if (phase === "exam" && q) {
     const isLast = current === questions.length - 1;
-    return (
+    return renderWithTabBar(
       <div
         style={{
           display: "flex",
@@ -2900,7 +3800,7 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
                 {answeredCount}/{questions.length} answered
               </span>
             </div>
-            <TimerDisplay elapsed={elapsed} limit={EXAM_DURATION} />
+            <TimerDisplay elapsed={elapsed} limit={examDuration} />
           </div>
           <ProgressBar current={current + 1} total={questions.length} />
         </div>
@@ -3189,277 +4089,257 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
             </div>
           </div>
         )}
-      </div>
+      </div>,
     );
   }
 
   // ── render: review
   if (phase === "review")
-    return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-        {tabBar}
-        <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
-          {timedOut && (
-            <div
-              style={{
-                background: "var(--red-bg)",
-                border: "1px solid var(--red)",
-                borderRadius: "var(--radius-sm)",
-                padding: "10px 14px",
-                marginBottom: 16,
-                fontSize: "calc(12px * var(--scale, 1))",
-                color: "var(--red)",
-                fontWeight: 500,
-              }}
-            >
-              Time's up — exam submitted automatically.
-            </div>
-          )}
-
-          {/* score banner */}
+    return renderWithTabBar(
+      <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
+        {timedOut && (
           <div
             style={{
-              background: scoreBg(scorePercent),
-              borderRadius: "var(--radius)",
-              padding: "20px 24px",
+              background: "var(--red-bg)",
+              border: "1px solid var(--red)",
+              borderRadius: "var(--radius-sm)",
+              padding: "10px 14px",
               marginBottom: 16,
+              fontSize: "calc(12px * var(--scale, 1))",
+              color: "var(--red)",
+              fontWeight: 500,
+            }}
+          >
+            Time's up — exam submitted automatically.
+          </div>
+        )}
+
+        {/* score banner */}
+        <div
+          style={{
+            background: scoreBg(scorePercent),
+            borderRadius: "var(--radius)",
+            padding: "20px 24px",
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: "calc(11px * var(--scale, 1))",
+                fontWeight: 500,
+                color: "var(--ink-muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                marginBottom: 4,
+              }}
+            >
+              Final score — {examCode}
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: "calc(36px * var(--scale, 1))",
+                color: scoreColor(scorePercent),
+                lineHeight: 1,
+              }}
+            >
+              {scorePercent}
+              <span style={{ fontSize: "calc(18px * var(--scale, 1))" }}>
+                /100
+              </span>
+            </div>
+            <div
+              style={{
+                fontSize: "calc(12px * var(--scale, 1))",
+                color: "var(--ink-muted)",
+                marginTop: 6,
+              }}
+            >
+              {correctCount} correct · {questions.length - correctCount} wrong ·{" "}
+              {questions.length} total
+            </div>
+            {matchedSubject && matchedSubject.weight && (
+              <div
+                style={{
+                  fontSize: "calc(12px * var(--scale, 1))",
+                  color: scoreColor(scorePercent),
+                  marginTop: 2,
+                  fontWeight: 500,
+                }}
+              >
+                {weightedContribution?.toFixed(1)}% / {matchedSubject.weight}%
+                LLE Weighted Contribution
+              </div>
+            )}
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div
+              style={{
+                fontSize: "calc(13px * var(--scale, 1))",
+                fontWeight: 500,
+                color: scoreColor(scorePercent),
+              }}
+            >
+              {scoreLabel(scorePercent)}
+            </div>
+            <div
+              style={{
+                fontSize: "calc(11px * var(--scale, 1))",
+                color: "var(--ink-faint)",
+                marginTop: 4,
+              }}
+            >
+              Time taken: {formatTime(elapsed)}
+            </div>
+            <div
+              style={{
+                fontSize: "calc(11px * var(--scale, 1))",
+                color: "var(--ink-faint)",
+              }}
+            >
+              {sessionType === "exam" || sessionType === "custom"
+                ? "Score auto-logged to dashboard"
+                : "Score not logged (Practice Mode)"}
+            </div>
+          </div>
+        </div>
+
+        {/* save prompt */}
+        {(sessionType === "exam" ||
+          sessionType === "custom" ||
+          sessionType === "quiz") && (
+          <div
+            style={{
+              background: "var(--cream)",
+              border: "1px solid var(--cream-border)",
+              borderRadius: "var(--radius)",
+              padding: "14px 16px",
+              marginBottom: 20,
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
+              gap: 12,
             }}
           >
             <div>
               <div
                 style={{
-                  fontSize: "calc(11px * var(--scale, 1))",
-                  fontWeight: 500,
-                  color: "var(--ink-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
-                  marginBottom: 4,
-                }}
-              >
-                Final score — {examCode}
-              </div>
-              <div
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: "calc(36px * var(--scale, 1))",
-                  color: scoreColor(scorePercent),
-                  lineHeight: 1,
-                }}
-              >
-                {scorePercent}
-                <span style={{ fontSize: "calc(18px * var(--scale, 1))" }}>
-                  /100
-                </span>
-              </div>
-              <div
-                style={{
-                  fontSize: "calc(12px * var(--scale, 1))",
-                  color: "var(--ink-muted)",
-                  marginTop: 6,
-                }}
-              >
-                {correctCount} correct · {questions.length - correctCount} wrong
-                · {questions.length} total
-              </div>
-              {matchedSubject && matchedSubject.weight && (
-                <div
-                  style={{
-                    fontSize: "calc(12px * var(--scale, 1))",
-                    color: scoreColor(scorePercent),
-                    marginTop: 2,
-                    fontWeight: 500,
-                  }}
-                >
-                  {weightedContribution?.toFixed(1)}% / {matchedSubject.weight}%
-                  LLE Weighted Contribution
-                </div>
-              )}
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div
-                style={{
-                  fontSize: "calc(13px * var(--scale, 1))",
-                  fontWeight: 500,
-                  color: scoreColor(scorePercent),
-                }}
-              >
-                {scoreLabel(scorePercent)}
-              </div>
-              <div
-                style={{
-                  fontSize: "calc(11px * var(--scale, 1))",
-                  color: "var(--ink-faint)",
-                  marginTop: 4,
-                }}
-              >
-                Time taken: {formatTime(elapsed)}
-              </div>
-              <div
-                style={{
-                  fontSize: "calc(11px * var(--scale, 1))",
-                  color: "var(--ink-faint)",
-                }}
-              >
-                {sessionType === "exam" || sessionType === "custom"
-                  ? "Score auto-logged to dashboard"
-                  : "Score not logged (Practice Mode)"}
-              </div>
-            </div>
-          </div>
-
-          {/* save prompt */}
-          {(sessionType === "exam" ||
-            sessionType === "custom" ||
-            sessionType === "quiz") && (
-            <div
-              style={{
-                background: "var(--cream)",
-                border: "1px solid var(--cream-border)",
-                borderRadius: "var(--radius)",
-                padding: "14px 16px",
-                marginBottom: 20,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontSize: "calc(13px * var(--scale, 1))",
-                    fontWeight: 500,
-                    color: "var(--ink)",
-                    marginBottom: 2,
-                  }}
-                >
-                  Save this {sessionType === "quiz" ? "quiz" : "exam"} result?
-                </div>
-                <div
-                  style={{
-                    fontSize: "calc(11px * var(--scale, 1))",
-                    color: "var(--ink-faint)",
-                  }}
-                >
-                  Stores score, time taken, date, and all wrong answers for
-                  review later.
-                </div>
-              </div>
-              {saved ? (
-                <div
-                  style={{
-                    fontSize: "calc(12px * var(--scale, 1))",
-                    color: "var(--green)",
-                    fontWeight: 500,
-                    flexShrink: 0,
-                  }}
-                >
-                  ✓ Saved
-                </div>
-              ) : (
-                <button
-                  onClick={saveExam}
-                  style={{
-                    padding: "8px 18px",
-                    fontSize: "calc(13px * var(--scale, 1))",
-                    fontWeight: 500,
-                    background: "var(--accent)",
-                    color: "white",
-                    border: "none",
-                    borderRadius: "var(--radius-sm)",
-                    cursor: "pointer",
-                    fontFamily: "var(--font-body)",
-                    flexShrink: 0,
-                  }}
-                >
-                  Save
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* wrong answers */}
-          {wrongItems.length > 0 && (
-            <>
-              <div
-                style={{
                   fontSize: "calc(13px * var(--scale, 1))",
                   fontWeight: 500,
                   color: "var(--ink)",
-                  marginBottom: 12,
+                  marginBottom: 2,
                 }}
               >
-                Review — {wrongItems.length} incorrect
-              </div>
-              <WrongReview wrong={wrongItems} />
-            </>
-          )}
-          {wrongItems.length === 0 && (
-            <div style={{ textAlign: "center", padding: "24px 0" }}>
-              <div
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: "calc(18px * var(--scale, 1))",
-                  color: "#3D6B4F",
-                  marginBottom: 6,
-                }}
-              >
-                Perfect score.
+                Save this {sessionType === "quiz" ? "quiz" : "exam"} result?
               </div>
               <div
                 style={{
-                  fontSize: "calc(13px * var(--scale, 1))",
-                  color: "var(--ink-muted)",
+                  fontSize: "calc(11px * var(--scale, 1))",
+                  color: "var(--ink-faint)",
                 }}
               >
-                Every single answer was correct.
+                Stores score, time taken, date, and all wrong answers for review
+                later.
               </div>
             </div>
-          )}
-
-          {/* actions */}
-          <div style={{ display: "flex", gap: 8, marginTop: 24 }}>
-            <button
-              onClick={startExam}
-              style={{
-                flex: 1,
-                padding: "10px 0",
-                fontSize: "calc(13px * var(--scale, 1))",
-                fontWeight: 500,
-                background: "var(--accent-bg)",
-                color: "var(--accent)",
-                border: "1px solid var(--accent-light)",
-                borderRadius: "var(--radius-sm)",
-                cursor: "pointer",
-                fontFamily: "var(--font-body)",
-              }}
-            >
-              Retake exam
-            </button>
-            {sessionType !== "classification" && (
-              <button
-                onClick={() => setPhase("configure")}
+            {saved ? (
+              <div
                 style={{
-                  flex: 1,
-                  padding: "10px 0",
+                  fontSize: "calc(12px * var(--scale, 1))",
+                  color: "var(--green)",
+                  fontWeight: 500,
+                  flexShrink: 0,
+                }}
+              >
+                ✓ Saved
+              </div>
+            ) : (
+              <button
+                onClick={saveExam}
+                style={{
+                  padding: "8px 18px",
                   fontSize: "calc(13px * var(--scale, 1))",
                   fontWeight: 500,
-                  background: "var(--cream-dark)",
-                  color: "var(--ink-muted)",
-                  border: "1px solid var(--cream-border)",
+                  background: "var(--accent)",
+                  color: "white",
+                  border: "none",
                   borderRadius: "var(--radius-sm)",
                   cursor: "pointer",
                   fontFamily: "var(--font-body)",
+                  flexShrink: 0,
                 }}
               >
-                Change settings
+                Save
               </button>
             )}
+          </div>
+        )}
+
+        {/* wrong answers */}
+        {wrongItems.length > 0 && (
+          <>
+            <div
+              style={{
+                fontSize: "calc(13px * var(--scale, 1))",
+                fontWeight: 500,
+                color: "var(--ink)",
+                marginBottom: 12,
+              }}
+            >
+              Review — {wrongItems.length} incorrect
+            </div>
+            <WrongReview wrong={wrongItems} />
+          </>
+        )}
+        {wrongItems.length === 0 && (
+          <div style={{ textAlign: "center", padding: "24px 0" }}>
+            <div
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: "calc(18px * var(--scale, 1))",
+                color: "#3D6B4F",
+                marginBottom: 6,
+              }}
+            >
+              Perfect score.
+            </div>
+            <div
+              style={{
+                fontSize: "calc(13px * var(--scale, 1))",
+                color: "var(--ink-muted)",
+              }}
+            >
+              Every single answer was correct.
+            </div>
+          </div>
+        )}
+
+        {/* actions */}
+        <div style={{ display: "flex", gap: 8, marginTop: 24 }}>
+          <button
+            onClick={startExam}
+            style={{
+              flex: 1,
+              padding: "10px 0",
+              fontSize: "calc(13px * var(--scale, 1))",
+              fontWeight: 500,
+              background: "var(--accent-bg)",
+              color: "var(--accent)",
+              border: "1px solid var(--accent-light)",
+              borderRadius: "var(--radius-sm)",
+              cursor: "pointer",
+              fontFamily: "var(--font-body)",
+            }}
+          >
+            Retake exam
+          </button>
+          {sessionType !== "classification" && (
             <button
-              onClick={reset}
+              onClick={() => setPhase("configure")}
               style={{
                 flex: 1,
                 padding: "10px 0",
@@ -3473,11 +4353,28 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
                 fontFamily: "var(--font-body)",
               }}
             >
-              Load new file
+              Change settings
             </button>
-          </div>
+          )}
+          <button
+            onClick={reset}
+            style={{
+              flex: 1,
+              padding: "10px 0",
+              fontSize: "calc(13px * var(--scale, 1))",
+              fontWeight: 500,
+              background: "var(--cream-dark)",
+              color: "var(--ink-muted)",
+              border: "1px solid var(--cream-border)",
+              borderRadius: "var(--radius-sm)",
+              cursor: "pointer",
+              fontFamily: "var(--font-body)",
+            }}
+          >
+            {sessionType === "p2p" ? "Back to P2P Sessions" : "Load new file"}
+          </button>
         </div>
-      </div>
+      </div>,
     );
 
   return null;

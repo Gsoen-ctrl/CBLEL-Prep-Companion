@@ -24,3 +24,6 @@ public/DDC.txt
 public/LCC.txt
 public/MARC.txt
 /src-tauri
+public/P2PQS
+src/utils/p2pConstants.ts
+src/P2pAdmin.tsx

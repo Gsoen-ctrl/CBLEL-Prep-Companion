@@ -673,6 +673,16 @@ export default function Dashboard({
   const [weaknesses, setWeaknesses] = useState<
     { short: string; name: string; score: number }[]
   >([]);
+  const [p2pWeaknesses, setP2pWeaknesses] = useState<
+    {
+      short: string;
+      name: string;
+      score: number;
+      preScore: number | null;
+      postScore: number | null;
+    }[]
+  >([]);
+  const [showP2p, setShowP2p] = useState(false);
 
   useEffect(() => {
     const exams = loadSavedExams();
@@ -685,12 +695,29 @@ export default function Dashboard({
       subjectStats[s.short] = { totalScore: 0, count: 0, name: s.name };
     });
 
+    const p2pStats: Record<
+      string,
+      { preScore: number | null; postScore: number | null }
+    > = {};
+    subjects.forEach((s) => {
+      p2pStats[s.short] = { preScore: null, postScore: null };
+    });
+
     exams.forEach((e: any) => {
       // e.examCode is something like "LOM_1" or "LOM"
       const shortCode = e.examCode?.split("_")[0];
-      if (shortCode && subjectStats[shortCode]) {
-        subjectStats[shortCode].totalScore += e.score;
-        subjectStats[shortCode].count += 1;
+
+      if (e.sessionType === "p2p" && e.examCode) {
+        const type = e.examCode.split("_")[1]; // PRE or POST
+        if (shortCode && p2pStats[shortCode]) {
+          if (type === "PRE") p2pStats[shortCode].preScore = e.score;
+          if (type === "POST") p2pStats[shortCode].postScore = e.score;
+        }
+      } else {
+        if (shortCode && subjectStats[shortCode] && e.sessionType !== "p2p") {
+          subjectStats[shortCode].totalScore += e.score;
+          subjectStats[shortCode].count += 1;
+        }
       }
     });
 
@@ -709,9 +736,27 @@ export default function Dashboard({
     setWeaknesses(
       calculated as { short: string; name: string; score: number }[],
     );
+
+    const calculatedP2p = subjects.map((s) => {
+      const stats = p2pStats[s.short];
+      // Display the post score if it exists, otherwise pre score.
+      // If neither, then null.
+      const scoreToUse =
+        stats.postScore !== null ? stats.postScore : stats.preScore;
+      return {
+        short: s.short,
+        name: s.name,
+        score: scoreToUse,
+        preScore: stats.preScore,
+        postScore: stats.postScore,
+      };
+    });
+    setP2pWeaknesses(calculatedP2p as any);
   }, [subjects]);
 
-  const validWeaknesses = weaknesses.filter((w) => w.score !== null);
+  const activeWeaknesses = showP2p ? p2pWeaknesses : weaknesses;
+
+  const validWeaknesses = activeWeaknesses.filter((w) => w.score !== null);
   const totalGWA =
     validWeaknesses.length > 0
       ? Math.round(
@@ -1113,14 +1158,41 @@ export default function Dashboard({
       >
         <div
           style={{
-            fontSize: "calc(13px * var(--scale, 1))",
-            fontWeight: 500,
-            color: "var(--ink)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
             marginBottom: 12,
           }}
         >
-          Subject weaknesses
+          <div
+            style={{
+              fontSize: "calc(13px * var(--scale, 1))",
+              fontWeight: 500,
+              color: "var(--ink)",
+            }}
+          >
+            Subject weaknesses
+          </div>
+          {p2pWeaknesses.some(
+            (w) => w.preScore !== null || w.postScore !== null,
+          ) && (
+            <button
+              onClick={() => setShowP2p(!showP2p)}
+              style={{
+                fontSize: "calc(11px * var(--scale, 1))",
+                padding: "4px 8px",
+                borderRadius: "var(--radius-sm)",
+                background: showP2p ? "var(--accent)" : "var(--cream-dark)",
+                color: showP2p ? "#fff" : "var(--ink-muted)",
+                border: "1px solid var(--cream-border)",
+                cursor: "pointer",
+              }}
+            >
+              {showP2p ? "Showing P2P" : "Show P2P"}
+            </button>
+          )}
         </div>
+
         {validWeaknesses.length === 0 ? (
           <div
             style={{
@@ -1358,10 +1430,23 @@ export default function Dashboard({
                     lineHeight: 1.4,
                   }}
                 >
-                  {lowestSubject?.score !== undefined &&
-                  lowestSubject.score < 50
-                    ? `Warning: ${lowestSubject.short} is below 50%. You must review this subject to avoid failing the exam.`
-                    : `Your lowest score is in ${lowestSubject?.short} (${lowestSubject?.score}%). Consider dedicating more time here.`}
+                  {showP2p
+                    ? (() => {
+                        const lowerCount = p2pWeaknesses.filter(
+                          (w) =>
+                            w.preScore !== null &&
+                            w.postScore !== null &&
+                            w.postScore < w.preScore,
+                        ).length;
+                        if (lowerCount > 0) {
+                          return "You scored a lower number than your pre-exam in some subjects. Consider studying more on those.";
+                        }
+                        return "Great job, your post-exam scores show improvement or consistency!";
+                      })()
+                    : lowestSubject?.score !== undefined &&
+                        lowestSubject.score < 50
+                      ? `Warning: ${lowestSubject.short} is below 50%. You must review this subject to avoid failing the exam.`
+                      : `Your lowest score is in ${lowestSubject?.short} (${lowestSubject?.score}%). Consider dedicating more time here.`}
                 </div>
               </div>
             </div>

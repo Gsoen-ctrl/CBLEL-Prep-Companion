@@ -1,3 +1,14 @@
+export function getAnonymousUuid(): string {
+  let uuid = loadJSON<string>("p2p-uuid", "");
+  if (!uuid) {
+    uuid = crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).substring(2, 15);
+    saveJSON("p2p-uuid", uuid);
+  }
+  return uuid;
+}
+
 export function loadJSON<T>(key: string, fallback: T): T {
   try {
     const v = localStorage.getItem(key);

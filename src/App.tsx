@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import Dashboard from "./Dashboard";
+import P2pAdmin from "./P2pAdmin";
 import MockExam from "./MockExam";
 import Onboarding from "./Onboarding";
 import TourOverlay from "./TourOverlay";
@@ -573,6 +574,16 @@ export default function App() {
     setMilestones(next);
     saveMilestones(next);
     setEditingMilestone(null);
+  }
+
+  // Simple router logic for hidden admin page since we don't use React Router
+  const path = window.location.pathname;
+  // Tauri hash mode workaround or vite route bypass
+  if (
+    path.includes("p2p-admin") ||
+    window.location.search.includes("p2p-admin")
+  ) {
+    return <P2pAdmin />;
   }
 
   if (!userName || !startDateStr) {
