@@ -303,6 +303,113 @@ export const SettingsPage: React.FC<{
         </div>
       </div>
 
+      {/* App Data Transfer */}
+      <div
+        style={{
+          padding: "16px",
+          background: "var(--cream-dark)",
+          borderRadius: "var(--radius)",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "calc(14px * var(--scale, 1))",
+            fontWeight: 500,
+            color: "var(--ink)",
+            marginBottom: 4,
+          }}
+        >
+          App Data
+        </div>
+        <div
+          style={{
+            fontSize: "calc(12px * var(--scale, 1))",
+            color: "var(--ink-muted)",
+            marginBottom: 16,
+          }}
+        >
+          Export or import your saved exams, progress, and settings to transfer
+          devices.
+        </div>
+        <div style={{ display: "flex", gap: 12 }}>
+          <button
+            onClick={() => {
+              const data: Record<string, string> = {};
+              for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key) {
+                  data[key] = localStorage.getItem(key) || "";
+                }
+              }
+              const blob = new Blob([JSON.stringify(data, null, 2)], {
+                type: "application/json",
+              });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `solari-data-${new Date().toISOString().split("T")[0]}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            style={{
+              flex: 1,
+              padding: "10px",
+              fontSize: "calc(14px * var(--scale, 1))",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--cream-border)",
+              background: "var(--cream)",
+              color: "var(--ink)",
+              cursor: "pointer",
+              fontFamily: "var(--font-body)",
+            }}
+          >
+            Export Data
+          </button>
+
+          <button
+            onClick={() => {
+              const input = document.createElement("input");
+              input.type = "file";
+              input.accept = ".json";
+              input.onchange = (e) => {
+                const file = (e.target as HTMLInputElement).files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (re) => {
+                  try {
+                    const json = JSON.parse(re.target?.result as string);
+                    if (typeof json === "object" && json !== null) {
+                      localStorage.clear();
+                      for (const [key, value] of Object.entries(json)) {
+                        localStorage.setItem(key, String(value));
+                      }
+                      window.location.reload();
+                    }
+                  } catch (err) {
+                    alert("Failed to import app data. Invalid JSON file.");
+                  }
+                };
+                reader.readAsText(file);
+              };
+              input.click();
+            }}
+            style={{
+              flex: 1,
+              padding: "10px",
+              fontSize: "calc(14px * var(--scale, 1))",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--cream-border)",
+              background: "var(--cream)",
+              color: "var(--ink)",
+              cursor: "pointer",
+              fontFamily: "var(--font-body)",
+            }}
+          >
+            Import Data
+          </button>
+        </div>
+      </div>
+
       {/* App Info & Updates */}
       <div
         style={{

@@ -195,6 +195,42 @@ function processQuestionsSubset(
 
 // ── storage helpers
 const EXAMS_KEY = "saved-exams";
+const WEBHOOK_QUEUE_KEY = "p2p-webhook-queue";
+
+function queueFailedWebhook(payload: any) {
+  try {
+    const s = localStorage.getItem(WEBHOOK_QUEUE_KEY);
+    const queue = s ? JSON.parse(s) : [];
+    queue.push(payload);
+    localStorage.setItem(WEBHOOK_QUEUE_KEY, JSON.stringify(queue));
+  } catch {}
+}
+
+function flushWebhookQueue() {
+  const webhookUrl = import.meta.env.VITE_WEBHOOK_URL;
+  if (!webhookUrl || !navigator.onLine) return;
+
+  try {
+    const s = localStorage.getItem(WEBHOOK_QUEUE_KEY);
+    const queue: any[] = s ? JSON.parse(s) : [];
+    if (queue.length === 0) return;
+
+    // We can't await inside a forEach natively, but since it's no-cors we can just fire them all off
+    queue.forEach((payload) => {
+      fetch(webhookUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
+    });
+
+    // Clear queue after attempting flush
+    localStorage.removeItem(WEBHOOK_QUEUE_KEY);
+  } catch {}
+}
+
+window.addEventListener("online", flushWebhookQueue);
 
 function scoreKey(date: Date) {
   return `score-${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
@@ -267,7 +303,15 @@ function scoreLabel(pct: number): string {
 }
 
 // ── progress bar
-function ProgressBar({ current, total }: { current: number; total: number }) {
+function ProgressBar({
+  current,
+  total,
+  bookmarks = [],
+}: {
+  current: number;
+  total: number;
+  bookmarks?: number[];
+}) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
       <div
@@ -276,6 +320,7 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
           height: 3,
           background: "var(--cream-border)",
           borderRadius: 2,
+          position: "relative",
           overflow: "hidden",
         }}
       >
@@ -286,8 +331,26 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
             width: `${(current / total) * 100}%`,
             background: "var(--accent)",
             transition: "width 0.3s ease",
+            position: "absolute",
+            top: 0,
+            left: 0,
           }}
         />
+        {bookmarks.map((b) => (
+          <div
+            key={b}
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              width: 2,
+              background: "var(--sienna)",
+              left: `${((b + 1) / total) * 100}%`,
+              transform: "translateX(-50%)",
+              zIndex: 2,
+            }}
+          />
+        ))}
       </div>
       <span
         style={{
@@ -304,8 +367,8 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
 
 // ── timer display
 function TimerDisplay({ elapsed, limit }: { elapsed: number; limit: number }) {
-  const remaining = limit - elapsed;
-  const pct = elapsed / limit;
+  const remaining = limit - Math.min(elapsed, limit);
+  const pct = remaining / limit;
   const urgent = remaining <= 300;
   const critical = remaining <= 60;
   const color = critical
@@ -512,7 +575,9 @@ function PreviousExams({ filterType }: { filterType: "exam" | "quiz" }) {
 
   const exams = allExams.filter((e) =>
     filterType === "exam"
-      ? e.sessionType === "exam" || e.sessionType === "custom"
+      ? e.sessionType === "exam" ||
+        e.sessionType === "custom" ||
+        e.sessionType === "p2p"
       : e.sessionType === "quiz",
   );
 
@@ -586,6 +651,13 @@ function PreviousExams({ filterType }: { filterType: "exam" | "quiz" }) {
           : exam.examCode;
         if (exam.sessionType === "custom") {
           displayName = `Custom Exam · ${exam.examCode}`;
+        } else if (exam.sessionType === "p2p") {
+          const type = exam.examCode.includes("_PRE")
+            ? "Pre-Exam"
+            : "Post-Exam";
+          displayName = matchedSubject
+            ? `P2P Session · ${matchedSubject.short} ${type}`
+            : `P2P Session · ${exam.examCode}`;
         } else if (exam.sessionType === "quiz") {
           displayName = matchedSubject
             ? `${matchedSubject.name} · Quiz`
@@ -864,6 +936,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [revealed, setRevealed] = useState<Record<number, boolean>>({});
+  const [bookmarks, setBookmarks] = useState<number[]>([]);
 
   // timer
   const [elapsed, setElapsed] = useState(0);
@@ -1048,6 +1121,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
     setCurrent(0);
     setAnswers({});
     setRevealed({});
+    setBookmarks([]);
     setPendingExam(null);
     setSaved(false);
     setPhase("exam");
@@ -1132,12 +1206,20 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
       };
       const webhookUrl = import.meta.env.VITE_WEBHOOK_URL;
       if (webhookUrl) {
-        fetch(webhookUrl, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }).catch(() => {});
+        if (navigator.onLine) {
+          fetch(webhookUrl, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }).catch(() => {
+            // Queue if fetch fails (e.g. proxy block but technically online)
+            queueFailedWebhook(payload);
+          });
+        } else {
+          // Queue immediately if offline
+          queueFailedWebhook(payload);
+        }
       }
 
       appendSavedExam(examRecord); // Auto save for their personal dashboard
@@ -1819,28 +1901,30 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
               const isCompleted = p2pExams.some(
                 (e) => e.examCode === sess.code,
               );
+              const isLocked = sess.password === "locked";
+              const isDisabled = isCompleted || isLocked;
               return (
                 <button
                   key={sess.id}
                   onClick={() => {
-                    if (isCompleted) return;
+                    if (isDisabled) return;
                     setShowP2pModal(sess);
                     setP2pPassword("");
                     setP2pError("");
                   }}
                   style={{
-                    background: isCompleted
+                    background: isDisabled
                       ? "var(--cream-dark)"
                       : "var(--cream)",
                     border: "1px solid var(--cream-border)",
                     borderRadius: "12px",
                     padding: "16px",
                     textAlign: "left",
-                    cursor: isCompleted ? "not-allowed" : "pointer",
+                    cursor: isDisabled ? "not-allowed" : "pointer",
                     display: "flex",
                     flexDirection: "column",
                     gap: "4px",
-                    opacity: isCompleted ? 0.6 : 1,
+                    opacity: isDisabled ? 0.6 : 1,
                   }}
                 >
                   <span
@@ -1860,7 +1944,8 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
                       lineHeight: 1.4,
                     }}
                   >
-                    {sess.name} {isCompleted ? "(Completed)" : ""}
+                    {sess.name}{" "}
+                    {isCompleted ? "(Completed)" : isLocked ? "(Locked)" : ""}
                   </span>
                 </button>
               );
@@ -3816,7 +3901,11 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
             </div>
             <TimerDisplay elapsed={elapsed} limit={examDuration} />
           </div>
-          <ProgressBar current={current + 1} total={questions.length} />
+          <ProgressBar
+            current={current + 1}
+            total={questions.length}
+            bookmarks={bookmarks}
+          />
         </div>
 
         {/* question */}
@@ -3838,8 +3927,35 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
               borderRadius: "var(--radius)",
               padding: "24px 28px",
               marginBottom: 16,
+              position: "relative",
             }}
           >
+            <button
+              onClick={() => {
+                setBookmarks((prev) =>
+                  prev.includes(current)
+                    ? prev.filter((b) => b !== current)
+                    : [...prev, current],
+                );
+              }}
+              style={{
+                position: "absolute",
+                top: 16,
+                right: 20,
+                background: "none",
+                border: "none",
+                fontSize: "calc(20px * var(--scale, 1))",
+                cursor: "pointer",
+                opacity: bookmarks.includes(current) ? 1 : 0.3,
+                color: bookmarks.includes(current)
+                  ? "var(--sienna)"
+                  : "var(--ink-muted)",
+                transition: "all 0.2s",
+              }}
+              title="Bookmark Question"
+            >
+              ★
+            </button>
             <div
               style={{
                 fontSize: "calc(11px * var(--scale, 1))",
