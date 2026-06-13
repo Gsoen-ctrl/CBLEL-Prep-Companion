@@ -63,7 +63,10 @@ function parseExamCode(raw: string): string {
   return match ? match[1].toUpperCase() : "";
 }
 
-function parseQuestions(raw: string, isP2p: boolean = false): Question[] {
+export function parseQuestions(
+  raw: string,
+  isP2p: boolean = false,
+): Question[] {
   const lines = raw
     .split("\n")
     .map((l) => l.trim())
@@ -76,7 +79,7 @@ function parseQuestions(raw: string, isP2p: boolean = false): Question[] {
   const optionReOld = /^(\*?)([A-Da-d])[.)]\s+(.+)$/;
   const optionReNew = /^(\*?)O\.\s+(.+)$/i;
   const explanationRe = /^Y:\s+(.+)$/i;
-  const examCodeRe = /^[A-Z]{2,6}_\d+$/i;
+  const examCodeRe = /^[A-Z]{2,6}_[A-Z0-9]+$/i;
 
   let questionCounter = 1;
 
@@ -98,6 +101,9 @@ function parseQuestions(raw: string, isP2p: boolean = false): Question[] {
       let questionNumber = questionCounter++;
       if (isP2p && qMatchOld) {
         questionNumber = parseInt(qMatchOld[1], 10);
+      } else if (isP2p && qMatchNew) {
+        // We already assigned questionNumber = questionCounter++, which is correct for Q. format!
+        // No explicit digit assignment needed.
       }
 
       current = { number: questionNumber, stem: stemText, options: [] };
@@ -303,15 +309,7 @@ function scoreLabel(pct: number): string {
 }
 
 // ── progress bar
-function ProgressBar({
-  current,
-  total,
-  bookmarks = [],
-}: {
-  current: number;
-  total: number;
-  bookmarks?: number[];
-}) {
+function ProgressBar({ current, total }: { current: number; total: number }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
       <div
@@ -320,7 +318,6 @@ function ProgressBar({
           height: 3,
           background: "var(--cream-border)",
           borderRadius: 2,
-          position: "relative",
           overflow: "hidden",
         }}
       >
@@ -331,26 +328,8 @@ function ProgressBar({
             width: `${(current / total) * 100}%`,
             background: "var(--accent)",
             transition: "width 0.3s ease",
-            position: "absolute",
-            top: 0,
-            left: 0,
           }}
         />
-        {bookmarks.map((b) => (
-          <div
-            key={b}
-            style={{
-              position: "absolute",
-              top: 0,
-              bottom: 0,
-              width: 2,
-              background: "var(--sienna)",
-              left: `${((b + 1) / total) * 100}%`,
-              transform: "translateX(-50%)",
-              zIndex: 2,
-            }}
-          />
-        ))}
       </div>
       <span
         style={{
@@ -937,6 +916,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [revealed, setRevealed] = useState<Record<number, boolean>>({});
   const [bookmarks, setBookmarks] = useState<number[]>([]);
+  const [showBookmarksModal, setShowBookmarksModal] = useState(false);
 
   // timer
   const [elapsed, setElapsed] = useState(0);
@@ -3901,11 +3881,31 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
             </div>
             <TimerDisplay elapsed={elapsed} limit={examDuration} />
           </div>
-          <ProgressBar
-            current={current + 1}
-            total={questions.length}
-            bookmarks={bookmarks}
-          />
+          <ProgressBar current={current + 1} total={questions.length} />
+
+          {/* Centered Bookmarks Button */}
+          <div
+            style={{ display: "flex", justifyContent: "center", marginTop: 12 }}
+          >
+            <button
+              onClick={() => setShowBookmarksModal(true)}
+              style={{
+                padding: "6px 16px",
+                background: "var(--cream-dark)",
+                border: "1px solid var(--cream-border)",
+                borderRadius: "var(--radius-sm)",
+                color: "var(--ink-muted)",
+                fontSize: "calc(12px * var(--scale, 1))",
+                fontWeight: 500,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              ★ Bookmarks ({bookmarks.length})
+            </button>
+          </div>
         </div>
 
         {/* question */}
@@ -4079,6 +4079,23 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
                 </div>
               );
             })}
+
+            {isRevealed && q.explanation && (
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: "12px 16px",
+                  background: "var(--cream-dark)",
+                  borderLeft: "2px solid var(--accent)",
+                  borderRadius: "0 var(--radius-sm) var(--radius-sm) 0",
+                  fontSize: "calc(13px * var(--scale, 1))",
+                  color: "var(--ink-muted)",
+                  lineHeight: 1.5,
+                }}
+              >
+                <strong>Explanation:</strong> {q.explanation}
+              </div>
+            )}
           </div>
         </div>
 
@@ -4127,6 +4144,141 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
             {isLast ? "Finish exam" : "Next →"}
           </button>
         </div>
+
+        {/* Bookmarks Modal */}
+        {showBookmarksModal && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.4)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 9999,
+              padding: "24px",
+            }}
+            onClick={() => setShowBookmarksModal(false)}
+          >
+            <div
+              style={{
+                background: "var(--cream)",
+                border: "1px solid var(--cream-border)",
+                borderRadius: "var(--radius)",
+                padding: "24px",
+                width: "100%",
+                maxWidth: 400,
+                maxHeight: "80vh",
+                overflowY: "auto",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 16,
+                }}
+              >
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: "calc(16px * var(--scale, 1))",
+                    fontWeight: 600,
+                    color: "var(--ink)",
+                  }}
+                >
+                  Bookmarked Questions
+                </h3>
+                <button
+                  onClick={() => setShowBookmarksModal(false)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    fontSize: "20px",
+                    cursor: "pointer",
+                    color: "var(--ink-muted)",
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              {bookmarks.length === 0 ? (
+                <div
+                  style={{
+                    fontSize: "calc(13px * var(--scale, 1))",
+                    color: "var(--ink-muted)",
+                    textAlign: "center",
+                    padding: "20px 0",
+                  }}
+                >
+                  You haven't bookmarked any questions yet.
+                </div>
+              ) : (
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                >
+                  {bookmarks
+                    .sort((a, b) => a - b)
+                    .map((bIdx) => (
+                      <div
+                        key={bIdx}
+                        onClick={() => {
+                          setCurrent(bIdx);
+                          setShowBookmarksModal(false);
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "12px 16px",
+                          background: "var(--cream-dark)",
+                          borderRadius: "var(--radius-sm)",
+                          border: "1px solid var(--cream-border)",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "calc(14px * var(--scale, 1))",
+                            fontWeight: 500,
+                            color: "var(--ink)",
+                          }}
+                        >
+                          Question {bIdx + 1}
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBookmarks((prev) =>
+                              prev.filter((b) => b !== bIdx),
+                            );
+                          }}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            fontSize: "calc(18px * var(--scale, 1))",
+                            color: "var(--sienna)",
+                            cursor: "pointer",
+                            padding: 0,
+                          }}
+                          title="Remove bookmark"
+                        >
+                          ★
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {showFinishConfirm && (
           <div
