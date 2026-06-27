@@ -1808,18 +1808,16 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
           flex: 1,
           display: "flex",
           flexDirection: "column",
-          padding: "24px 80px",
+          padding: "24px 50px",
         }}
       >
         <div
           style={{
             display: "flex",
-            flexDirection:
-              "column" /* Changed from row to column to stack them */,
-            alignItems:
-              "flex-start" /* Changed from center to align button to the left */,
+            flexDirection: "column",
+            alignItems: "flex-start",
             marginBottom: 24,
-            gap: 12 /* This controls the vertical spacing between button and text */,
+            gap: 12,
           }}
         >
           <button

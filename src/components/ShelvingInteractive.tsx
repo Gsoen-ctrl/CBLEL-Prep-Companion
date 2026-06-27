@@ -22,6 +22,15 @@ export const ShelvingInteractive: React.FC<ShelvingInteractiveProps> = ({
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
+  const [isDragging, setIsDragging] = useState(false);
+  const [pointerPos, setPointerPos] = useState<{ x: number; y: number } | null>(
+    null,
+  );
+  const [startPos, setStartPos] = useState<{ x: number; y: number } | null>(
+    null,
+  );
+  const canvasRef = React.useRef<HTMLDivElement>(null);
+
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [userSubmission, setUserSubmission] = useState<string[] | null>(null);
@@ -54,60 +63,104 @@ export const ShelvingInteractive: React.FC<ShelvingInteractiveProps> = ({
     setTray((prev) => [...prev, item]);
   };
 
-  const handleDragStart = (e: React.DragEvent, item: string) => {
+  const handlePointerDown = (e: React.PointerEvent, item: string) => {
     if (hasSubmitted) return;
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+
+    const target = e.currentTarget as HTMLElement;
+    target.setPointerCapture(e.pointerId);
+
     setDraggedItem(item);
-    e.dataTransfer.effectAllowed = "move";
-    setTimeout(() => {
-      if (e.target) (e.target as HTMLElement).style.opacity = "0.4";
-    }, 0);
-  };
-
-  const handleDragEnd = (e: React.DragEvent) => {
-    setDraggedItem(null);
+    setPointerPos({ x: e.clientX, y: e.clientY });
+    setStartPos({ x: e.clientX, y: e.clientY });
+    setIsDragging(false);
     setDragOverIndex(null);
-    if (e.target) (e.target as HTMLElement).style.opacity = "1";
   };
 
-  const handleDragOverCanvas = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (hasSubmitted || !draggedItem) return;
-    e.dataTransfer.dropEffect = "move";
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!draggedItem || !startPos) return;
 
-    // Calculate precise drop index based on mouse position within the canvas
-    const rect = e.currentTarget.getBoundingClientRect();
-    const children = Array.from(e.currentTarget.children).filter(
-      (child) => child.getAttribute("data-draggable") === "true",
-    );
+    const dx = e.clientX - startPos.x;
+    const dy = e.clientY - startPos.y;
 
-    let foundIndex = children.length;
-    for (let i = 0; i < children.length; i++) {
-      const childRect = children[i].getBoundingClientRect();
-      // Compare vertical center of child to cursor
-      if (e.clientY < childRect.top + childRect.height / 2) {
-        foundIndex = i;
-        break;
+    let currentlyDragging = isDragging;
+    if (!currentlyDragging && Math.sqrt(dx * dx + dy * dy) > 5) {
+      currentlyDragging = true;
+      setIsDragging(true);
+    }
+
+    if (currentlyDragging) {
+      setPointerPos({ x: e.clientX, y: e.clientY });
+
+      const canvasEl = canvasRef.current;
+      if (canvasEl) {
+        const rect = canvasEl.getBoundingClientRect();
+        if (
+          e.clientX >= rect.left - 20 &&
+          e.clientX <= rect.right + 20 &&
+          e.clientY >= rect.top - 20 &&
+          e.clientY <= rect.bottom + 20
+        ) {
+          const children = Array.from(canvasEl.children).filter(
+            (child) => child.getAttribute("data-draggable") === "true",
+          );
+
+          let foundIndex = children.length;
+          for (let i = 0; i < children.length; i++) {
+            const childRect = children[i].getBoundingClientRect();
+            if (e.clientY < childRect.top + childRect.height / 2) {
+              foundIndex = i;
+              break;
+            }
+          }
+          setDragOverIndex(foundIndex);
+        } else {
+          setDragOverIndex(null);
+        }
       }
     }
-    setDragOverIndex(foundIndex);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (hasSubmitted || !draggedItem) return;
+  const handlePointerUp = (e: React.PointerEvent, item: string) => {
+    if (!draggedItem) return;
 
-    const dropIndex = dragOverIndex !== null ? dragOverIndex : canvas.length;
+    const target = e.currentTarget as HTMLElement;
+    if (target.hasPointerCapture(e.pointerId)) {
+      target.releasePointerCapture(e.pointerId);
+    }
 
-    if (tray.includes(draggedItem)) {
-      setTray((prev) => prev.filter((i) => i !== draggedItem));
+    if (!isDragging) {
+      // Treat as click
+      if (tray.includes(item)) {
+        handleTrayItemClick(item);
+      } else if (canvas.includes(item)) {
+        handleCanvasItemClick(item);
+      }
+    } else {
+      // Treat as drop
+      if (dragOverIndex !== null) {
+        handleDropAction(dragOverIndex, item);
+      }
+    }
+
+    setDraggedItem(null);
+    setPointerPos(null);
+    setStartPos(null);
+    setIsDragging(false);
+    setDragOverIndex(null);
+  };
+
+  const handleDropAction = (dropIndex: number, item: string) => {
+    if (tray.includes(item)) {
+      setTray((prev) => prev.filter((i) => i !== item));
       setCanvas((prev) => {
         const newCanvas = [...prev];
-        newCanvas.splice(dropIndex, 0, draggedItem);
+        newCanvas.splice(dropIndex, 0, item);
         return newCanvas;
       });
-    } else if (canvas.includes(draggedItem)) {
+    } else if (canvas.includes(item)) {
       setCanvas((prev) => {
-        const draggedIndex = prev.indexOf(draggedItem);
+        const draggedIndex = prev.indexOf(item);
 
         let finalDropIndex = dropIndex;
         if (draggedIndex < dropIndex) {
@@ -118,13 +171,10 @@ export const ShelvingInteractive: React.FC<ShelvingInteractiveProps> = ({
 
         const newCanvas = [...prev];
         newCanvas.splice(draggedIndex, 1);
-        newCanvas.splice(finalDropIndex, 0, draggedItem);
+        newCanvas.splice(finalDropIndex, 0, item);
         return newCanvas;
       });
     }
-
-    setDraggedItem(null);
-    setDragOverIndex(null);
   };
 
   const handleConfirm = () => {
@@ -153,10 +203,39 @@ export const ShelvingInteractive: React.FC<ShelvingInteractiveProps> = ({
         flexDirection: "column",
         gap: 16,
         width: "100%",
+        touchAction: "none",
+        userSelect: "none",
+        WebkitUserSelect: "none",
       }}
     >
+      {/* Ghost Element for Dragging */}
+      {isDragging && draggedItem && pointerPos && (
+        <div
+          style={{
+            position: "fixed",
+            left: pointerPos.x,
+            top: pointerPos.y,
+            transform: "translate(-50%, -50%)",
+            pointerEvents: "none",
+            zIndex: 1000,
+            padding: "14px 16px",
+            background: "var(--cream)",
+            border: "1px solid var(--accent)",
+            borderRadius: "var(--radius)",
+            color: "var(--ink)",
+            fontSize: "calc(16px * var(--scale, 1))",
+            fontFamily: "var(--font-body)",
+            boxShadow: "0 8px 16px rgba(0,0,0,0.1)",
+            opacity: 0.9,
+          }}
+        >
+          {draggedItem}
+        </div>
+      )}
+
       {/* Canvas */}
       <div
+        ref={canvasRef}
         style={{
           minHeight: "180px",
           background: "var(--cream)",
@@ -169,8 +248,6 @@ export const ShelvingInteractive: React.FC<ShelvingInteractiveProps> = ({
           position: "relative",
           transition: "all 0.2s",
         }}
-        onDragOver={handleDragOverCanvas}
-        onDrop={handleDrop}
       >
         {canvas.length === 0 && (
           <div
@@ -189,26 +266,26 @@ export const ShelvingInteractive: React.FC<ShelvingInteractiveProps> = ({
         )}
 
         {canvas.map((item, idx) => {
-          const isDraggingThis = draggedItem === item;
+          const isDraggingThis = isDragging && draggedItem === item;
           return (
             <React.Fragment key={item}>
-              {dragOverIndex === idx && !isDraggingThis && (
+              {dragOverIndex === idx && draggedItem !== item && (
                 <div
                   style={{
                     height: "48px",
                     background: "rgba(0,0,0,0.03)",
                     borderRadius: "var(--radius)",
-                    border: "2px dashed var(--ink-muted)",
+                    border: "2px dashed var(--accent)",
                     margin: "4px 0",
                   }}
                 />
               )}
               <div
                 data-draggable="true"
-                draggable={!hasSubmitted}
-                onDragStart={(e) => handleDragStart(e, item)}
-                onDragEnd={handleDragEnd}
-                onClick={() => handleCanvasItemClick(item)}
+                onPointerDown={(e) => handlePointerDown(e, item)}
+                onPointerMove={handlePointerMove}
+                onPointerUp={(e) => handlePointerUp(e, item)}
+                onPointerCancel={(e) => handlePointerUp(e, item)}
                 style={{
                   padding: "14px 16px",
                   background:
@@ -250,10 +327,14 @@ export const ShelvingInteractive: React.FC<ShelvingInteractiveProps> = ({
                         : "var(--ink)",
                   fontSize: "calc(16px * var(--scale, 1))",
                   fontFamily: "var(--font-body)",
-                  cursor: hasSubmitted ? "default" : "pointer",
-                  opacity: isDraggingThis ? 0 : 1,
+                  cursor: hasSubmitted
+                    ? "default"
+                    : isDraggingThis
+                      ? "grabbing"
+                      : "grab",
+                  opacity: isDraggingThis ? 0.3 : 1,
                   boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
-                  transition: "all 0.15s ease",
+                  transition: isDraggingThis ? "none" : "all 0.15s ease",
                   userSelect: "none",
                 }}
               >
@@ -268,7 +349,7 @@ export const ShelvingInteractive: React.FC<ShelvingInteractiveProps> = ({
               height: "48px",
               background: "rgba(0,0,0,0.03)",
               borderRadius: "var(--radius)",
-              border: "2px dashed var(--ink-muted)",
+              border: "2px dashed var(--accent)",
               margin: "4px 0",
             }}
           />
@@ -288,29 +369,38 @@ export const ShelvingInteractive: React.FC<ShelvingInteractiveProps> = ({
           alignContent: "flex-start",
         }}
       >
-        {tray.map((item) => (
-          <div
-            key={item}
-            draggable={!hasSubmitted}
-            onDragStart={(e) => handleDragStart(e, item)}
-            onDragEnd={handleDragEnd}
-            onClick={() => handleTrayItemClick(item)}
-            style={{
-              padding: "12px 16px",
-              background: "var(--cream)",
-              border: "1px solid var(--cream-border)",
-              borderRadius: "var(--radius)",
-              color: "var(--ink)",
-              fontSize: "calc(15px * var(--scale, 1))",
-              fontFamily: "var(--font-body)",
-              cursor: hasSubmitted ? "default" : "pointer",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-              userSelect: "none",
-            }}
-          >
-            {item}
-          </div>
-        ))}
+        {tray.map((item) => {
+          const isDraggingThis = isDragging && draggedItem === item;
+          return (
+            <div
+              key={item}
+              onPointerDown={(e) => handlePointerDown(e, item)}
+              onPointerMove={handlePointerMove}
+              onPointerUp={(e) => handlePointerUp(e, item)}
+              onPointerCancel={(e) => handlePointerUp(e, item)}
+              style={{
+                padding: "12px 16px",
+                background: "var(--cream)",
+                border: "1px solid var(--cream-border)",
+                borderRadius: "var(--radius)",
+                color: "var(--ink)",
+                fontSize: "calc(15px * var(--scale, 1))",
+                fontFamily: "var(--font-body)",
+                cursor: hasSubmitted
+                  ? "default"
+                  : isDraggingThis
+                    ? "grabbing"
+                    : "grab",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                userSelect: "none",
+                opacity: isDraggingThis ? 0.3 : 1,
+                touchAction: "none",
+              }}
+            >
+              {item}
+            </div>
+          );
+        })}
       </div>
 
       {/* Confirm Button */}
