@@ -915,7 +915,13 @@ function PreviousExams({ filterType }: { filterType: "exam" | "quiz" }) {
 }
 
 // ── main component
-export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
+export default function MockExam({
+  isRestDay,
+  onExamActiveChange,
+}: {
+  isRestDay: boolean;
+  onExamActiveChange?: (isActive: boolean) => void;
+}) {
   const [view, setView] = useState<
     "exam" | "history-exams" | "history-quizzes" | "p2p-sessions" | "shelving"
   >("exam");
@@ -966,6 +972,10 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
   const [revealed, setRevealed] = useState<Record<number, boolean>>({});
   const [bookmarks, setBookmarks] = useState<number[]>([]);
   const [showBookmarksModal, setShowBookmarksModal] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  useEffect(() => {
+    if (onExamActiveChange) onExamActiveChange(phase === "exam");
+  }, [phase, onExamActiveChange]);
 
   // timer
   const [elapsed, setElapsed] = useState(0);
@@ -4250,6 +4260,25 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
             }}
           >
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <button
+                onClick={() => setShowExitConfirm(true)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  color: "var(--accent)",
+                  fontSize: "calc(14px * var(--scale, 1))",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  fontFamily: "var(--font-body)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  marginBottom: 4,
+                }}
+              >
+                ← Back
+              </button>
               <span
                 style={{
                   fontSize: "calc(12px * var(--scale, 1))",
@@ -4668,6 +4697,99 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
           </div>
         )}
 
+        {showExitConfirm && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.4)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 9999,
+              padding: "24px",
+            }}
+          >
+            <div
+              style={{
+                background: "var(--cream)",
+                border: "1px solid var(--cream-border)",
+                borderRadius: "var(--radius)",
+                padding: "24px",
+                width: "100%",
+                maxWidth: 320,
+                boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+              }}
+            >
+              <h3
+                style={{
+                  margin: "0 0 8px 0",
+                  fontSize: "calc(16px * var(--scale, 1))",
+                  fontWeight: 600,
+                  color: "var(--ink)",
+                }}
+              >
+                Exit Exam?
+              </h3>
+              <p
+                style={{
+                  margin: "0 0 20px 0",
+                  fontSize: "calc(13px * var(--scale, 1))",
+                  color: "var(--ink-muted)",
+                  lineHeight: 1.4,
+                }}
+              >
+                Are you sure you want to exit? Your current progress will be
+                lost.
+              </p>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "12px",
+                  justifyContent: "flex-end",
+                }}
+              >
+                <button
+                  onClick={() => setShowExitConfirm(false)}
+                  style={{
+                    padding: "8px 16px",
+                    background: "var(--cream-dark)",
+                    border: "1px solid var(--cream-border)",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--ink)",
+                    fontSize: "calc(13px * var(--scale, 1))",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowExitConfirm(false);
+                    reset();
+                  }}
+                  style={{
+                    padding: "8px 16px",
+                    background: "var(--red)",
+                    border: "none",
+                    borderRadius: "var(--radius-sm)",
+                    color: "white",
+                    fontSize: "calc(13px * var(--scale, 1))",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                  }}
+                >
+                  Exit
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showFinishConfirm && (
           <div
             style={{
@@ -4760,6 +4882,7 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
           </div>
         )}
       </div>,
+      false, // hide tabBar
     );
   }
 

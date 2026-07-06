@@ -321,6 +321,7 @@ export default function App() {
   }, [touchStartX]);
 
   const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
+  const [isMockExamActive, setIsMockExamActive] = useState(false);
 
   const [activeTab, setActiveTab] = useState<
     | "dashboard"
@@ -667,7 +668,7 @@ export default function App() {
 
   return (
     <div
-      className="app-container"
+      className={`app-container ${activeTab === "practice" && isMockExamActive ? "fullscreen-exam" : ""}`}
       style={{
         height: "100dvh",
         width: "100%",
@@ -694,202 +695,207 @@ export default function App() {
       )}
 
       {/* ── header ── */}
-      {activeTab !== "study" && (
-        <header
-          style={{
-            padding: "14px 24px",
-            borderBottom: "1px solid var(--cream-border)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 16,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <div>
-              <div
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: "calc(22px * var(--scale, 1))",
-                  color: "var(--ink)",
-                  lineHeight: 1.2,
-                }}
-              >
-                {userName}'s Boards
-              </div>
-              <div
-                style={{
-                  fontSize: "calc(12px * var(--scale, 1))",
-                  color: "var(--ink-faint)",
-                  marginTop: 2,
-                }}
-              >
-                CBLEL {examDate.getFullYear()} · The Licensed Librarian Roadmap
+      {activeTab !== "study" &&
+        !(activeTab === "practice" && isMockExamActive) && (
+          <header
+            style={{
+              padding: "14px 24px",
+              borderBottom: "1px solid var(--cream-border)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 16,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <div>
+                <div
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: "calc(22px * var(--scale, 1))",
+                    color: "var(--ink)",
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {userName}'s Boards
+                </div>
+                <div
+                  style={{
+                    fontSize: "calc(12px * var(--scale, 1))",
+                    color: "var(--ink-faint)",
+                    marginTop: 2,
+                  }}
+                >
+                  CBLEL {examDate.getFullYear()} · The Licensed Librarian
+                  Roadmap
+                </div>
               </div>
             </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {updateAvailable && !showUpdateModal && (
-              <button
-                onClick={() => setShowUpdateModal(true)}
-                style={{
-                  fontSize: "calc(11px * var(--scale, 1))",
-                  fontWeight: 500,
-                  padding: "2px 8px",
-                  background: "var(--accent)",
-                  color: "white",
-                  border: "none",
-                  borderRadius: 4,
-                  cursor: "pointer",
-                  fontFamily: "var(--font-body)",
-                }}
-              >
-                Update available
-              </button>
-            )}
-            {!restDay && (
-              <span
-                style={{
-                  fontSize: "calc(11px * var(--scale, 1))",
-                  fontWeight: 500,
-                  padding: "2px 8px",
-                  background: "var(--accent-bg)",
-                  color: "var(--accent)",
-                  borderRadius: 4,
-                }}
-              >
-                {short}
-              </span>
-            )}
-            {restDay && (
-              <span
-                style={{
-                  fontSize: "calc(11px * var(--scale, 1))",
-                  fontWeight: 500,
-                  padding: "2px 8px",
-                  background: "var(--cream-dark)",
-                  color: "var(--ink-muted)",
-                  borderRadius: 4,
-                }}
-              >
-                Rest day
-              </span>
-            )}
-            <div className="desktop-settings" style={{ position: "relative" }}>
-              <button
-                onClick={() => setShowSettings(true)}
-                title="Settings"
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "var(--radius-sm)",
-                  border: "1px solid var(--cream-border)",
-                  background: showSettings
-                    ? "var(--cream-border)"
-                    : "var(--cream-dark)",
-                  cursor: "pointer",
-                  fontSize: "calc(15px * var(--scale, 1))",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "var(--ink-muted)",
-                  transition: "background 0.15s",
-                }}
-              >
-                ⚙
-              </button>
-              {showSettings && (
-                <div
-                  className="fade-in"
-                  onClick={() => setShowSettings(false)}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {updateAvailable && !showUpdateModal && (
+                <button
+                  onClick={() => setShowUpdateModal(true)}
                   style={{
-                    position: "fixed",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: "rgba(0,0,0,0.4)",
-                    backdropFilter: "blur(4px)",
-                    WebkitBackdropFilter: "blur(4px)",
-                    zIndex: 9999,
+                    fontSize: "calc(11px * var(--scale, 1))",
+                    fontWeight: 500,
+                    padding: "2px 8px",
+                    background: "var(--accent)",
+                    color: "white",
+                    border: "none",
+                    borderRadius: 4,
+                    cursor: "pointer",
+                    fontFamily: "var(--font-body)",
+                  }}
+                >
+                  Update available
+                </button>
+              )}
+              {!restDay && (
+                <span
+                  style={{
+                    fontSize: "calc(11px * var(--scale, 1))",
+                    fontWeight: 500,
+                    padding: "2px 8px",
+                    background: "var(--accent-bg)",
+                    color: "var(--accent)",
+                    borderRadius: 4,
+                  }}
+                >
+                  {short}
+                </span>
+              )}
+              {restDay && (
+                <span
+                  style={{
+                    fontSize: "calc(11px * var(--scale, 1))",
+                    fontWeight: 500,
+                    padding: "2px 8px",
+                    background: "var(--cream-dark)",
+                    color: "var(--ink-muted)",
+                    borderRadius: 4,
+                  }}
+                >
+                  Rest day
+                </span>
+              )}
+              <div
+                className="desktop-settings"
+                style={{ position: "relative" }}
+              >
+                <button
+                  onClick={() => setShowSettings(true)}
+                  title="Settings"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "var(--radius-sm)",
+                    border: "1px solid var(--cream-border)",
+                    background: showSettings
+                      ? "var(--cream-border)"
+                      : "var(--cream-dark)",
+                    cursor: "pointer",
+                    fontSize: "calc(15px * var(--scale, 1))",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    padding: 24,
+                    color: "var(--ink-muted)",
+                    transition: "background 0.15s",
                   }}
                 >
+                  ⚙
+                </button>
+                {showSettings && (
                   <div
-                    onClick={(e) => e.stopPropagation()}
+                    className="fade-in"
+                    onClick={() => setShowSettings(false)}
                     style={{
-                      width: "100%",
-                      maxWidth: 500,
-                      maxHeight: "90vh",
-                      background: "var(--cream)",
-                      borderRadius: "var(--radius)",
-                      border: "1px solid var(--cream-border)",
-                      boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
-                      overflowY: "auto",
+                      position: "fixed",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: "rgba(0,0,0,0.4)",
+                      backdropFilter: "blur(4px)",
+                      WebkitBackdropFilter: "blur(4px)",
+                      zIndex: 9999,
                       display: "flex",
-                      flexDirection: "column",
-                      position: "relative",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: 24,
                     }}
                   >
-                    <button
-                      onClick={() => setShowSettings(false)}
+                    <div
+                      onClick={(e) => e.stopPropagation()}
                       style={{
-                        position: "absolute",
-                        top: 16,
-                        right: 16,
-                        width: 32,
-                        height: 32,
-                        borderRadius: "50%",
-                        background: "var(--cream-dark)",
-                        border: "none",
-                        fontSize: 18,
-                        color: "var(--ink-muted)",
-                        cursor: "pointer",
+                        width: "100%",
+                        maxWidth: 500,
+                        maxHeight: "90vh",
+                        background: "var(--cream)",
+                        borderRadius: "var(--radius)",
+                        border: "1px solid var(--cream-border)",
+                        boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+                        overflowY: "auto",
                         display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        zIndex: 1,
+                        flexDirection: "column",
+                        position: "relative",
                       }}
                     >
-                      ✕
-                    </button>
-                    <div style={{ padding: "24px" }}>
-                      <SettingsPage
-                        updateAvailable={updateAvailable}
-                        latestRelease={latestRelease}
-                        onOpenUpdateModal={() => setShowUpdateModal(true)}
-                        darkMode={darkMode}
-                        setDarkMode={setDarkMode}
-                        simpleFont={simpleFont}
-                        setSimpleFont={setSimpleFont}
-                        fontSize={fontSize}
-                        setFontSize={setFontSize}
-                        enableStreak={enableStreak}
-                        setEnableStreak={(val: boolean) => {
-                          setEnableStreak(val);
-                          saveJSON("enableStreak", val);
-                          if (!val) {
-                            setStudyStreak(0);
-                            saveJSON("studyStreak", 0);
-                          }
+                      <button
+                        onClick={() => setShowSettings(false)}
+                        style={{
+                          position: "absolute",
+                          top: 16,
+                          right: 16,
+                          width: 32,
+                          height: 32,
+                          borderRadius: "50%",
+                          background: "var(--cream-dark)",
+                          border: "none",
+                          fontSize: 18,
+                          color: "var(--ink-muted)",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          zIndex: 1,
                         }}
-                        enablePomodoro={enablePomodoro}
-                        setEnablePomodoro={(val: boolean) => {
-                          setEnablePomodoro(val);
-                          saveJSON("enablePomodoro", val);
-                        }}
-                      />
+                      >
+                        ✕
+                      </button>
+                      <div style={{ padding: "24px" }}>
+                        <SettingsPage
+                          updateAvailable={updateAvailable}
+                          latestRelease={latestRelease}
+                          onOpenUpdateModal={() => setShowUpdateModal(true)}
+                          darkMode={darkMode}
+                          setDarkMode={setDarkMode}
+                          simpleFont={simpleFont}
+                          setSimpleFont={setSimpleFont}
+                          fontSize={fontSize}
+                          setFontSize={setFontSize}
+                          enableStreak={enableStreak}
+                          setEnableStreak={(val: boolean) => {
+                            setEnableStreak(val);
+                            saveJSON("enableStreak", val);
+                            if (!val) {
+                              setStudyStreak(0);
+                              saveJSON("studyStreak", 0);
+                            }
+                          }}
+                          enablePomodoro={enablePomodoro}
+                          setEnablePomodoro={(val: boolean) => {
+                            setEnablePomodoro(val);
+                            saveJSON("enablePomodoro", val);
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
-        </header>
-      )}
+          </header>
+        )}
 
       {/* ── date nav ── */}
       {activeTab !== "dashboard" &&
@@ -956,58 +962,59 @@ export default function App() {
         )}
 
       {/* ── tabs ── */}
-      {activeTab !== "study" && (
-        <div
-          className="desktop-tabs"
-          style={{
-            display: "flex",
-            borderBottom: "1px solid var(--cream-border)",
-            padding: "0 24px",
-            overflowX: "auto",
-          }}
-        >
-          {(
-            [
-              "dashboard",
-              "practice",
-              "study",
-              "checklist",
-              "milestones",
-              "subjects",
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => {
-                if (tab === "checklist" && activeTab === "checklist") {
-                  setChecklistHeaderClicks((prev) => prev + 1);
-                } else {
-                  switchTab(tab);
-                }
-              }}
-              style={{
-                fontFamily: "var(--font-body)",
-                fontSize: "calc(13px * var(--scale, 1))",
-                padding: "10px 14px",
-                background: "none",
-                border: "none",
-                whiteSpace: "nowrap",
-                borderBottom:
-                  activeTab === tab
-                    ? "2px solid var(--ink)"
-                    : "2px solid transparent",
-                color: activeTab === tab ? "var(--ink)" : "var(--ink-faint)",
-                cursor: "pointer",
-                fontWeight: activeTab === tab ? 500 : 400,
-                transition: "color 0.15s",
-                textTransform: "capitalize",
-              }}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-      )}
+      {activeTab !== "study" &&
+        !(activeTab === "practice" && isMockExamActive) && (
+          <div
+            className="desktop-tabs"
+            style={{
+              display: "flex",
+              borderBottom: "1px solid var(--cream-border)",
+              padding: "0 24px",
+              overflowX: "auto",
+            }}
+          >
+            {(
+              [
+                "dashboard",
+                "practice",
+                "study",
+                "checklist",
+                "milestones",
+                "subjects",
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => {
+                  if (tab === "checklist" && activeTab === "checklist") {
+                    setChecklistHeaderClicks((prev) => prev + 1);
+                  } else {
+                    switchTab(tab);
+                  }
+                }}
+                style={{
+                  fontFamily: "var(--font-body)",
+                  fontSize: "calc(13px * var(--scale, 1))",
+                  padding: "10px 14px",
+                  background: "none",
+                  border: "none",
+                  whiteSpace: "nowrap",
+                  borderBottom:
+                    activeTab === tab
+                      ? "2px solid var(--ink)"
+                      : "2px solid transparent",
+                  color: activeTab === tab ? "var(--ink)" : "var(--ink-faint)",
+                  cursor: "pointer",
+                  fontWeight: activeTab === tab ? 500 : 400,
+                  transition: "color 0.15s",
+                  textTransform: "capitalize",
+                }}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        )}
 
       {/* ── main ── */}
       <main
@@ -1038,7 +1045,12 @@ export default function App() {
             onNavigateToPractice={() => switchTab("practice")}
           />
         )}
-        {activeTab === "practice" && <MockExam isRestDay={restDay} />}
+        {activeTab === "practice" && (
+          <MockExam
+            isRestDay={restDay}
+            onExamActiveChange={setIsMockExamActive}
+          />
+        )}
 
         {/* checklist */}
         {activeTab === "checklist" && (
@@ -1901,13 +1913,15 @@ export default function App() {
       {enablePomodoro && activeTab !== "study" && activeTab !== "practice" && (
         <Pomodoro />
       )}
-      <BottomNav
-        activeTab={activeTab}
-        setActiveTab={switchTab}
-        onMoreClick={() => setIsMoreSheetOpen(true)}
-        studyStreak={studyStreak}
-        enableStreak={enableStreak}
-      />
+      {!(activeTab === "practice" && isMockExamActive) && (
+        <BottomNav
+          activeTab={activeTab}
+          setActiveTab={switchTab}
+          onMoreClick={() => setIsMoreSheetOpen(true)}
+          studyStreak={studyStreak}
+          enableStreak={enableStreak}
+        />
+      )}
       <MoreSheet
         isOpen={isMoreSheetOpen}
         onClose={() => setIsMoreSheetOpen(false)}
